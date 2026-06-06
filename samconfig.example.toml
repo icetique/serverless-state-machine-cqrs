@@ -19,7 +19,7 @@ confirm_changeset = true
 resolve_s3 = true
 s3_prefix = "payments-example"
 region = "eu-central-1"
-parameter_overrides = "DatabaseUrl=\"REPLACE_ME\" EventPublisherMode=\"local\" EventBusName=\"default\""
+parameter_overrides = "DatabaseUrl=\"REPLACE_ME\" EventPublisherMode=\"local\" EventBusName=\"default\" FrontendOrigin=\"http://localhost:5173\" SupabaseIssuer=\"https://your-project-ref.supabase.co/auth/v1\" SupabaseAudience=\"authenticated\""
 image_repositories = []
 
 [default.package.parameters]

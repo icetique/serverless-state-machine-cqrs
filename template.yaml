@@ -39,31 +39,110 @@ Resources:
             ContentUri: layers/lambda-utils/
             CompatibleRuntimes:
                 - nodejs24.x
+    # NOTE: Using explicit DefinitionBody instead of SAM shorthand (Auth + CorsConfiguration +
+    # event-driven route generation) to work around a known SAM bug where
+    # AWS::Serverless::HttpApi with Auth.DefaultAuthorizer silently fails to
+    # synthesize routes, authorizers, and deployments.
+    # See: https://github.com/awslabs/serverless-application-model/issues/1556
+    #      https://github.com/aws/serverless-application-model/issues/2688
+    #      https://github.com/aws/serverless-application-model/issues/2689
     PaymentsHttpApi:
         Type: AWS::Serverless::HttpApi
         Properties:
             StageName: Prod
-            CorsConfiguration:
-                AllowOrigins:
-                    - !Ref FrontendOrigin
-                AllowHeaders:
-                    - authorization
-                    - content-type
-                    - idempotency-key
-                    - x-debug-simulate-post-commit-crash
-                AllowMethods:
-                    - GET
-                    - POST
-                    - OPTIONS
-            Auth:
-                DefaultAuthorizer: SupabaseJwtAuthorizer
-                Authorizers:
-                    SupabaseJwtAuthorizer:
-                        IdentitySource: $request.header.Authorization
-                        JwtConfiguration:
-                            issuer: !Ref SupabaseIssuer
-                            audience:
-                                - !Ref SupabaseAudience
+            FailOnWarnings: true
+            RouteSettings:
+                $default:
+                    ThrottlingBurstLimit: 10
+                    ThrottlingRateLimit: 5
+            DefinitionBody:
+              openapi: '3.0.1'
+              info:
+                title: !Sub '${AWS::StackName}-api'
+                version: '1.0'
+              security:
+                - SupabaseJwtAuthorizer: []
+              paths:
+                /agreements:
+                  post:
+                    parameters:
+                      - name: Idempotency-Key
+                        in: header
+                        schema:
+                          type: string
+                          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                        required: true
+                        description: Idempotency key for safe retries
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateAgreementFunction.Arn}/invocations
+                  get:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListAgreementsFunction.Arn}/invocations
+                /agreements/{agreementId}/approve:
+                  post:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApproveAgreementFunction.Arn}/invocations
+                /agreements/{agreementId}/fund:
+                  post:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FundAgreementFunction.Arn}/invocations
+                /agreements/{agreementId}/settle:
+                  post:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SettleAgreementFunction.Arn}/invocations
+                /debug/events:
+                  get:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DebugEventsFunction.Arn}/invocations
+                /ledger:
+                  get:
+                    x-amazon-apigateway-integration:
+                      type: aws_proxy
+                      httpMethod: POST
+                      payloadFormatVersion: '2.0'
+                      uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListLedgerFunction.Arn}/invocations
+              x-amazon-apigateway-cors:
+                allowOrigins:
+                  - !Ref FrontendOrigin
+                allowHeaders:
+                  - authorization
+                  - content-type
+                  - idempotency-key
+                  - x-debug-simulate-post-commit-crash
+                allowMethods:
+                  - GET
+                  - POST
+                  - OPTIONS
+                allowCredentials: false
+              components:
+                securitySchemes:
+                  SupabaseJwtAuthorizer:
+                    type: oauth2
+                    x-amazon-apigateway-authorizer:
+                      type: jwt
+                      identitySource: $request.header.Authorization
+                      jwtConfiguration:
+                        issuer: !Ref SupabaseIssuer
+                        audience:
+                          - !Ref SupabaseAudience
     CreateAgreementFunction:
         Type: AWS::Serverless::Function
         Properties:

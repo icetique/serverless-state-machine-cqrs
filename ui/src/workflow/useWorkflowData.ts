@@ -194,7 +194,8 @@ export const useWorkflowData = ({
         const id = window.setInterval(() => {
             if (hasFundedRef.current && !isLoadingRef.current) {
                 isLoadingRef.current = true;
-                void loadAgreementsRef.current()
+                void loadAgreementsRef
+                    .current()
                     .catch(() => {})
                     .finally(() => {
                         isLoadingRef.current = false;
