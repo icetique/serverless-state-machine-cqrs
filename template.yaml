@@ -417,6 +417,8 @@ Resources:
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
+            Layers:
+                - !Ref SharedLayer
             Environment:
                 Variables:
                     DATABASE_URL: !Ref DatabaseUrl
@@ -445,6 +447,8 @@ Resources:
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
+            Layers:
+                - !Ref SharedLayer
             Environment:
                 Variables:
                     DATABASE_URL: !Ref DatabaseUrl
