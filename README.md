@@ -45,9 +45,10 @@ Prerequisites:
 - Node.js
 - SAM CLI
 
-Run migrations:
+Run migrations (loads `DATABASE_URL` from `.env` automatically):
 
 ```bash
+cp .env.example .env   # first time only
 npm run migrate:up
 ```
 

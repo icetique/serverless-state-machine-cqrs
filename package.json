@@ -7,9 +7,9 @@
         "format": "prettier . --write",
         "format:check": "prettier . --check",
         "lint": "cd create-agreement && npm run lint && cd ../transition-agreement && npm run lint && cd ../list-agreements && npm run lint && cd ../debug-events && npm run lint && cd ../list-ledger && npm run lint && cd ../ui && npm run lint",
-        "migrate:create": "node-pg-migrate create -m db/migrations",
-        "migrate:up": "node-pg-migrate -m db/migrations up",
-        "migrate:down": "node-pg-migrate -m db/migrations down",
+        "migrate:create": "node-pg-migrate -m db/migrations --envPath .env create",
+        "migrate:up": "node-pg-migrate -m db/migrations --envPath .env up",
+        "migrate:down": "node-pg-migrate -m db/migrations --envPath .env down",
         "smoke:async-retry": "node scripts/smoke-async-retry.mjs",
         "smoke:local-layer": "node scripts/local-layer-smoke.mjs",
         "test": "cd create-agreement && npm test && cd ../transition-agreement && npm test && cd ../list-agreements && npm test && cd ../debug-events && npm test && cd ../list-ledger && npm test && cd ../ui && npm test",
@@ -21,6 +21,7 @@
         "pg": "^8.16.3"
     },
     "devDependencies": {
+        "dotenv": "^16.6.1",
         "node-pg-migrate": "^8.0.3",
         "prettier": "^3.5.3"
     }
