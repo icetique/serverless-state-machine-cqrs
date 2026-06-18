@@ -55,7 +55,7 @@ create / approve / fund (HTTP Lambda)
   EventBridge  (AgreementFunded)
         │
         ▼
-  settlement-queue (SQS)                 (DLQ: settlement-dlq after 3 receives)
+  settlement-queue (SQS, name: `{StackName}-settlement-queue`)   (DLQ: `{StackName}-settlement-dlq` after 3 receives)
         │
         ▼
   SettlementProcessorFunction            (SQS trigger; FUNDED → SETTLED + ledger)
@@ -68,6 +68,8 @@ Infrastructure is defined in `template.yaml`: `SettlementQueue`, `FundedEventRul
 - **Manual settle:** `POST /agreements/{id}/settle` exists but is off by default (`ENABLE_MANUAL_SETTLEMENT_TRIGGER=false`).
 
 See [Settlement execution modes](#settlement-execution-modes) for invoke commands and the retry smoke script.
+
+Queue names are scoped to the CloudFormation stack (`{StackName}-settlement-queue` / `{StackName}-settlement-dlq`). If you previously deployed with global queue names, see [docs/aws-settlement-queue-migration.md](docs/aws-settlement-queue-migration.md).
 
 ## Local setup
 

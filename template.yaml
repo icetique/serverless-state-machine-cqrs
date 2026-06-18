@@ -412,7 +412,7 @@ Resources:
     SettlementQueue:
         Type: AWS::SQS::Queue
         Properties:
-            QueueName: settlement-queue
+            QueueName: !Sub '${AWS::StackName}-settlement-queue'
             VisibilityTimeout: 30
             RedrivePolicy:
                 deadLetterTargetArn: !GetAtt SettlementDeadLetterQueue.Arn
@@ -423,7 +423,7 @@ Resources:
         UpdateReplacePolicy: Retain
         Type: AWS::SQS::Queue
         Properties:
-            QueueName: settlement-dlq
+            QueueName: !Sub '${AWS::StackName}-settlement-dlq'
 
     FundedEventRule:
         Type: AWS::Events::Rule
@@ -584,7 +584,7 @@ Resources:
             MetricName: ApproximateNumberOfMessagesVisible
             Dimensions:
                 - Name: QueueName
-                  Value: settlement-dlq
+                  Value: !GetAtt SettlementDeadLetterQueue.QueueName
             Statistic: Maximum
             Period: 300
             EvaluationPeriods: 1
@@ -845,6 +845,12 @@ Outputs:
     SettlementQueueUrl:
         Description: 'Settlement queue URL'
         Value: !Ref SettlementQueue
+    SettlementQueueName:
+        Description: 'Settlement queue name (stack-scoped)'
+        Value: !GetAtt SettlementQueue.QueueName
+    SettlementDeadLetterQueueName:
+        Description: 'Settlement DLQ name (stack-scoped)'
+        Value: !GetAtt SettlementDeadLetterQueue.QueueName
     FundedEventRuleArn:
         Description: 'EventBridge rule for AgreementFunded -> SQS'
         Value: !GetAtt FundedEventRule.Arn
