@@ -167,7 +167,7 @@ Resources:
     CreateAgreementFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: create-agreement/
+            CodeUri: functions/create-agreement/
             Handler: app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
@@ -201,7 +201,7 @@ Resources:
     DebugEventsFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: debug-events/
+            CodeUri: functions/debug-events/
             Handler: app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
@@ -234,7 +234,7 @@ Resources:
     ListAgreementsFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: list-agreements/
+            CodeUri: functions/list-agreements/
             Handler: app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
@@ -267,7 +267,7 @@ Resources:
     ListLedgerFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: list-ledger/
+            CodeUri: functions/list-ledger/
             Handler: app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
@@ -300,8 +300,8 @@ Resources:
     ApproveAgreementFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: transition-agreement/
-            Handler: app.lambdaHandler
+            CodeUri: functions/transition-agreement/
+            Handler: handlers/http/app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
@@ -333,12 +333,12 @@ Resources:
                 External:
                     - '@payments-example/lambda-utils'
                 EntryPoints:
-                    - app.ts
+                    - handlers/http/app.ts
     FundAgreementFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: transition-agreement/
-            Handler: app.lambdaHandler
+            CodeUri: functions/transition-agreement/
+            Handler: handlers/http/app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
@@ -370,12 +370,12 @@ Resources:
                 External:
                     - '@payments-example/lambda-utils'
                 EntryPoints:
-                    - app.ts
+                    - handlers/http/app.ts
     SettleAgreementFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: transition-agreement/
-            Handler: app.lambdaHandler
+            CodeUri: functions/transition-agreement/
+            Handler: handlers/http/app.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
@@ -408,7 +408,7 @@ Resources:
                 External:
                     - '@payments-example/lambda-utils'
                 EntryPoints:
-                    - app.ts
+                    - handlers/http/app.ts
     SettlementQueue:
         Type: AWS::SQS::Queue
         Properties:
@@ -456,8 +456,8 @@ Resources:
     SettlementProcessorFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: transition-agreement/
-            Handler: settlement-handler.lambdaHandler
+            CodeUri: functions/transition-agreement/
+            Handler: handlers/settlement/settlement-handler.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
@@ -487,12 +487,12 @@ Resources:
                 External:
                     - '@payments-example/lambda-utils'
                 EntryPoints:
-                    - settlement-handler.ts
+                    - handlers/settlement/settlement-handler.ts
     OutboxDispatcherFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: transition-agreement/
-            Handler: outbox-dispatcher.lambdaHandler
+            CodeUri: functions/transition-agreement/
+            Handler: handlers/outbox/outbox-dispatcher.lambdaHandler
             Runtime: nodejs24.x
             Architectures:
                 - x86_64
@@ -527,7 +527,7 @@ Resources:
                 External:
                     - '@payments-example/lambda-utils'
                 EntryPoints:
-                    - outbox-dispatcher.ts
+                    - handlers/outbox/outbox-dispatcher.ts
 
     CreateAgreementFunctionLogGroup:
         Type: AWS::Logs::LogGroup

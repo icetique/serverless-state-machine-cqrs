@@ -15,23 +15,55 @@ Serverless agreement and settlement workflow built with AWS SAM, Lambda, API Gat
 - Exposes a local UI for workflow execution, Supabase-backed sign-in, events, and ledger visibility
 - Includes a `SettlementProcessorFunction` that consumes settlement work from SQS-shaped input
 
+## Repository layout
+
+```text
+payments-example/
+├── apps/
+│   └── ui/                         # Vite/React frontend (role-scoped workflow UI)
+├── functions/
+│   ├── create-agreement/           # POST /agreements
+│   ├── transition-agreement/       # approve / fund / settle HTTP + async workers
+│   │   ├── handlers/http/          # API Gateway entry (app.ts)
+│   │   ├── handlers/settlement/    # SQS settlement processor
+│   │   ├── handlers/outbox/        # scheduled outbox dispatcher
+│   │   └── src/                    # shared domain code (repository, settlement, outbox)
+│   ├── list-agreements/            # GET /agreements
+│   ├── list-ledger/                # GET /ledger
+│   └── debug-events/               # GET /debug/events
+├── layers/lambda-utils/            # Lambda layer: JWT auth + HTTP helpers (runtime)
+├── shared/                         # Compile-time auth contract for the UI only
+├── tests/fixtures/http-api/        # Shared Lambda test fixtures (API Gateway events)
+├── db/migrations/                  # Postgres schema migrations
+├── docs/                           # Supabase setup, AWS migration notes
+├── events/                         # SAM invoke fixtures (e.g. SQS settlement event)
+├── scripts/                        # smoke tests and local layer checks
+└── template.yaml                   # SAM infrastructure
+```
+
+**Boundaries worth knowing:**
+
+- **`shared/`** holds `AuthContext` and JWT wire types for the UI. Lambdas cannot import it at runtime; they use **`layers/lambda-utils`** instead (same domain types, duplicated on purpose for packaging).
+- **`tests/fixtures/http-api/`** is for Lambda unit tests (mock API Gateway events). **`apps/ui/src/test-support/`** is for React/Vitest fixtures — different jobs, different folders.
+- Root **`npm test`** / **`npm run typecheck`** orchestrate all packages via `cd` chains; there is no npm workspaces setup (each package has its own `package-lock.json`).
+
 ## Main components
 
-- `create-agreement/`
+- `functions/create-agreement/`
     - `POST /agreements`
-- `transition-agreement/`
+- `functions/transition-agreement/`
     - `POST /agreements/{agreementId}/approve`
     - `POST /agreements/{agreementId}/fund`
     - `POST /agreements/{agreementId}/settle`
     - `SettlementProcessorFunction` for SQS/EventBridge-driven settlement execution
     - `OutboxDispatcherFunction` for durable event delivery
-- `list-agreements/`
+- `functions/list-agreements/`
     - `GET /agreements`
-- `debug-events/`
+- `functions/debug-events/`
     - `GET /debug/events`
-- `list-ledger/`
+- `functions/list-ledger/`
     - `GET /ledger`
-- `ui/`
+- `apps/ui/`
     - Vite/React frontend for role-scoped workflow operation
 - `db/migrations/`
     - schema for agreements, audit history, idempotency, and ledger
@@ -106,11 +138,11 @@ usual — auth still works, it just happens inside Lambda rather than at API Gat
 Start the UI:
 
 ```bash
-cd ui
+cd apps/ui
 npm run dev
 ```
 
-For local UI, leave `VITE_API_BASE_URL` unset in `ui/.env` (the app uses `/api`; Vite proxies that
+For local UI, leave `VITE_API_BASE_URL` unset in `apps/ui/.env` (the app uses `/api`; Vite proxies that
 to `http://127.0.0.1:3000`). Do not point the browser directly at SAM — cross-origin CORS preflight
 fails with the OpenAPI `DefinitionBody` template. Restart `npm run dev` after changing `vite.config.ts`.
 
@@ -192,51 +224,51 @@ npm run test:coverage
 UI unit tests (Vitest + Testing Library):
 
 ```bash
-cd ui && npm test
-cd ui && npm run test:coverage
-cd ui && npm run typecheck:test
+cd apps/ui && npm test
+cd apps/ui && npm run test:coverage
+cd apps/ui && npm run typecheck:test
 ```
 
 Optional browser smoke (requires local SAM + Vite + Supabase demo users — see [docs/supabase-setup.md](docs/supabase-setup.md)):
 
 ```bash
 # Terminal 1: sam local start-api …
-# Terminal 2: cd ui && npm run dev
-cd ui && npm run test:e2e
+# Terminal 2: cd apps/ui && npm run dev
+cd apps/ui && npm run test:e2e
 ```
 
 Per-package tests (also available from the root):
 
 ```bash
-cd create-agreement && npm test
-cd transition-agreement && npm test
-cd list-agreements && npm test
-cd debug-events && npm test
-cd list-ledger && npm test
+cd functions/create-agreement && npm test
+cd functions/transition-agreement && npm test
+cd functions/list-agreements && npm test
+cd functions/debug-events && npm test
+cd functions/list-ledger && npm test
 ```
 
 UI build:
 
 ```bash
-cd ui && npm run build
+cd apps/ui && npm run build
 ```
 
 ## Available commands
 
-| Command                     | Description                                  |
-| --------------------------- | -------------------------------------------- |
-| `npm test`                  | Run all Lambda package and UI unit tests     |
-| `npm run test:coverage`     | Run Lambda + UI tests with coverage          |
-| `npm run test:e2e`          | Playwright smoke (manual; needs local stack) |
-| `npm run typecheck`         | Type-check all Lambda packages and the UI    |
-| `npm run lint`              | Lint all Lambda packages and the UI          |
-| `npm run format`            | Format all files with Prettier               |
-| `npm run format:check`      | Check formatting without writing             |
-| `npm run build:layer`       | Compile the shared Lambda layer              |
-| `npm run migrate:up`        | Apply pending database migrations            |
-| `npm run migrate:down`      | Roll back the last migration                 |
-| `npm run migrate:create`    | Scaffold a new migration file                |
-| `npm run smoke:async-retry` | Run the end-to-end async retry smoke test    |
-| `cd ui && npm run dev`      | Start the Vite dev server                    |
-| `cd ui && npm run build`    | Build the UI for production                  |
-| `cd ui && npm run preview`  | Preview the production build locally         |
+| Command                         | Description                                  |
+| ------------------------------- | -------------------------------------------- |
+| `npm test`                      | Run all Lambda package and UI unit tests     |
+| `npm run test:coverage`         | Run Lambda + UI tests with coverage          |
+| `npm run test:e2e`              | Playwright smoke (manual; needs local stack) |
+| `npm run typecheck`             | Type-check all Lambda packages and the UI    |
+| `npm run lint`                  | Lint all Lambda packages and the UI          |
+| `npm run format`                | Format all files with Prettier               |
+| `npm run format:check`          | Check formatting without writing             |
+| `npm run build:layer`           | Compile the shared Lambda layer              |
+| `npm run migrate:up`            | Apply pending database migrations            |
+| `npm run migrate:down`          | Roll back the last migration                 |
+| `npm run migrate:create`        | Scaffold a new migration file                |
+| `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test    |
+| `cd apps/ui && npm run dev`     | Start the Vite dev server                    |
+| `cd apps/ui && npm run build`   | Build the UI for production                  |
+| `cd apps/ui && npm run preview` | Preview the production build locally         |

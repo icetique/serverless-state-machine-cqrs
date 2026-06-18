@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "strict": true,
+        "preserveConstEnums": true,
+        "noEmit": true,
+        "sourceMap": false,
+        "module": "es2015",
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@payments-example/lambda-utils": [
+                "../../layers/lambda-utils/nodejs/node_modules/@payments-example/lambda-utils/index.d.ts"
+            ]
+        },
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true
+    },
+    "exclude": ["node_modules"]
+}

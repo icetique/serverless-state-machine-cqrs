@@ -6,16 +6,16 @@
     "scripts": {
         "format": "prettier . --write",
         "format:check": "prettier . --check",
-        "lint": "cd create-agreement && npm run lint && cd ../transition-agreement && npm run lint && cd ../list-agreements && npm run lint && cd ../debug-events && npm run lint && cd ../list-ledger && npm run lint && cd ../ui && npm run lint",
+        "lint": "cd functions/create-agreement && npm run lint && cd ../transition-agreement && npm run lint && cd ../list-agreements && npm run lint && cd ../debug-events && npm run lint && cd ../list-ledger && npm run lint && cd ../../apps/ui && npm run lint",
         "migrate:create": "node-pg-migrate -m db/migrations --envPath .env create",
         "migrate:up": "node-pg-migrate -m db/migrations --envPath .env up",
         "migrate:down": "node-pg-migrate -m db/migrations --envPath .env down",
         "smoke:async-retry": "node scripts/smoke-async-retry.mjs",
         "smoke:local-layer": "node scripts/local-layer-smoke.mjs",
-        "test": "cd create-agreement && npm test && cd ../transition-agreement && npm test && cd ../list-agreements && npm test && cd ../debug-events && npm test && cd ../list-ledger && npm test && cd ../ui && npm test",
-        "test:coverage": "cd create-agreement && npm run unit -- --coverage --runInBand && cd ../transition-agreement && npm run unit -- --coverage --runInBand && cd ../list-agreements && npm run unit -- --coverage --runInBand && cd ../debug-events && npm run unit -- --coverage --runInBand && cd ../list-ledger && npm run unit -- --coverage --runInBand && cd ../ui && npm run test:coverage",
-        "test:e2e": "cd ui && npm run test:e2e",
-        "typecheck": "cd layers/lambda-utils && npm run build && cd ../.. && cd create-agreement && npm run compile && cd ../transition-agreement && npm run compile && cd ../list-agreements && npm run compile && cd ../debug-events && npm run compile && cd ../list-ledger && npm run compile && cd ../ui && npm run typecheck",
+        "test": "cd functions/create-agreement && npm test && cd ../transition-agreement && npm test && cd ../list-agreements && npm test && cd ../debug-events && npm test && cd ../list-ledger && npm test && cd ../../apps/ui && npm test",
+        "test:coverage": "cd functions/create-agreement && npm run unit -- --coverage --runInBand && cd ../transition-agreement && npm run unit -- --coverage --runInBand && cd ../list-agreements && npm run unit -- --coverage --runInBand && cd ../debug-events && npm run unit -- --coverage --runInBand && cd ../list-ledger && npm run unit -- --coverage --runInBand && cd ../../apps/ui && npm run test:coverage",
+        "test:e2e": "cd apps/ui && npm run test:e2e",
+        "typecheck": "cd layers/lambda-utils && npm run build && cd ../.. && cd functions/create-agreement && npm run compile && cd ../transition-agreement && npm run compile && cd ../list-agreements && npm run compile && cd ../debug-events && npm run compile && cd ../list-ledger && npm run compile && cd ../../apps/ui && npm run typecheck",
         "build:layer": "cd layers/lambda-utils && npm run build"
     },
     "dependencies": {
