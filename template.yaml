@@ -410,10 +410,13 @@ Resources:
                 EntryPoints:
                     - handlers/http/app.ts
     SettlementQueue:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::SQS::Queue
         Properties:
             QueueName: !Sub '${AWS::StackName}-settlement-queue'
             VisibilityTimeout: 30
+            MessageRetentionPeriod: 345600
             RedrivePolicy:
                 deadLetterTargetArn: !GetAtt SettlementDeadLetterQueue.Arn
                 maxReceiveCount: 3
@@ -424,6 +427,7 @@ Resources:
         Type: AWS::SQS::Queue
         Properties:
             QueueName: !Sub '${AWS::StackName}-settlement-dlq'
+            MessageRetentionPeriod: 1209600
 
     FundedEventRule:
         Type: AWS::Events::Rule
@@ -530,46 +534,64 @@ Resources:
                     - handlers/outbox/outbox-dispatcher.ts
 
     CreateAgreementFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/create-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     DebugEventsFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/debug-events'
             RetentionInDays: !Ref LogRetentionInDays
     ListAgreementsFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/list-agreements'
             RetentionInDays: !Ref LogRetentionInDays
     ListLedgerFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/list-ledger'
             RetentionInDays: !Ref LogRetentionInDays
     ApproveAgreementFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/approve-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     FundAgreementFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/fund-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     SettleAgreementFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/settle-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     SettlementProcessorFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/settlement-processor'
             RetentionInDays: !Ref LogRetentionInDays
     OutboxDispatcherFunctionLogGroup:
+        DeletionPolicy: Delete
+        UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Sub '/payments-example/${AWS::StackName}/outbox-dispatcher'

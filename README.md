@@ -53,7 +53,7 @@ This repo is a **working demo** of agreement workflow, outbox delivery, and asyn
 
 | Area                 | Choice                                                   | Why                                                                                                                    |
 | -------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **CI**               | No GitHub Actions                                        | Quality gate is manual: `npm test`, `npm run typecheck`, `sam build`, `sam validate` before demo or deploy.            |
+| **CI**               | No GitHub Actions                                        | Quality gate is manual: `npm test`, `npm run typecheck`, `npm run validate:template`, `sam build` before demo or deploy. |
 | **Monorepo tooling** | No npm workspaces                                        | Keeps SAM `CodeUri` paths and per-Lambda packages straightforward; root scripts chain `cd` into each package.          |
 | **IaC routing**      | OpenAPI `DefinitionBody` plus explicit `Events: HttpApi` | SAM bug workaround so JWT authorizer routes deploy correctly — see comment block in `template.yaml`.                   |
 | **Outbox dispatch**  | At-least-once to EventBridge                             | Publish and `markPublished` cannot share a Postgres transaction with `PutEvents`; settlement is idempotent downstream. |
@@ -277,6 +277,7 @@ cd apps/ui && npm run build
 | `npm run test:e2e`              | Playwright smoke (manual; needs local stack) |
 | `npm run typecheck`             | Type-check all Lambda packages and the UI    |
 | `npm run lint`                  | Lint all Lambda packages and the UI          |
+| `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`) |
 | `npm run format`                | Format all files with Prettier               |
 | `npm run format:check`          | Check formatting without writing             |
 | `npm run build:layer`           | Compile the shared Lambda layer              |

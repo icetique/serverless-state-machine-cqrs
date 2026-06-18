@@ -1,0 +1,7 @@
+# https://github.com/aws-cloudformation/cfn-lint
+regions:
+    - eu-central-1
+templates:
+    - template.yaml
+include_checks:
+    - I

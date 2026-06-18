@@ -7,6 +7,7 @@
         "format": "prettier . --write",
         "format:check": "prettier . --check",
         "lint": "cd functions/create-agreement && npm run lint && cd ../transition-agreement && npm run lint && cd ../list-agreements && npm run lint && cd ../debug-events && npm run lint && cd ../list-ledger && npm run lint && cd ../../apps/ui && npm run lint",
+        "validate:template": "sam validate --lint",
         "migrate:create": "node-pg-migrate -m db/migrations --envPath .env create",
         "migrate:up": "node-pg-migrate -m db/migrations --envPath .env up",
         "migrate:down": "node-pg-migrate -m db/migrations --envPath .env down",
