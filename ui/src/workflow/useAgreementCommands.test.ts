@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionIdentity } from '../../../shared/auth-contract';
 import type { AgreementSummary } from '../types';
 import { useAgreementCommands } from './useAgreementCommands';
+import { createWorkflowApi } from './workflowApi';
 
 const merchantIdentity: SessionIdentity = {
     email: 'merchant_1@example.com',
@@ -21,6 +22,7 @@ const fundedAgreement: AgreementSummary = {
 };
 
 const buildHeaders = () => ({});
+const api = createWorkflowApi({ apiBaseUrl: '/api', buildHeaders });
 
 describe('useAgreementCommands active-action timer', () => {
     beforeEach(() => {
@@ -46,8 +48,7 @@ describe('useAgreementCommands active-action timer', () => {
 
         const { result, unmount } = renderHook(() =>
             useAgreementCommands({
-                apiBaseUrl: '/api',
-                buildHeaders,
+                api,
                 identity: merchantIdentity,
                 isManualSettlementTriggerEnabled: true,
                 loadAgreements,
@@ -84,8 +85,7 @@ describe('useAgreementCommands active-action timer', () => {
 
         const { result } = renderHook(() =>
             useAgreementCommands({
-                apiBaseUrl: '/api',
-                buildHeaders,
+                api,
                 identity: merchantIdentity,
                 isManualSettlementTriggerEnabled: true,
                 loadAgreements,

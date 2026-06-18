@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionIdentity } from '../../../shared/auth-contract';
 import type { AgreementSummary } from '../types';
 import { useWorkflowData } from './useWorkflowData';
+import { createWorkflowApi } from './workflowApi';
 
 const merchantIdentity: SessionIdentity = {
     email: 'merchant_1@example.com',
@@ -21,6 +22,7 @@ const fundedAgreement: AgreementSummary = {
 };
 
 const buildHeaders = () => ({});
+const api = createWorkflowApi({ apiBaseUrl: '/api', buildHeaders });
 
 describe('useWorkflowData FUNDED poll', () => {
     afterEach(() => {
@@ -45,8 +47,7 @@ describe('useWorkflowData FUNDED poll', () => {
 
         const { result } = renderHook(() =>
             useWorkflowData({
-                apiBaseUrl: '/api',
-                buildHeaders,
+                api,
                 identity: merchantIdentity,
                 sessionAccessToken: 'token',
             }),

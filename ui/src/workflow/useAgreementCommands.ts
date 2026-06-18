@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import type { SessionIdentity } from '../../../shared/auth-contract';
 import { canViewAgreementAction } from '../workflow';
 import type { AgreementResult, AgreementSummary, FormState, TransitionAction } from '../types';
+import type { WorkflowApi } from './workflowApi';
 
 const initialForm: FormState = {
     merchantId: '',
@@ -11,8 +12,7 @@ const initialForm: FormState = {
 };
 
 type UseAgreementCommandsArgs = {
-    apiBaseUrl: string;
-    buildHeaders: (headers?: Record<string, string>) => Record<string, string>;
+    api: WorkflowApi;
     identity: SessionIdentity | null;
     isManualSettlementTriggerEnabled: boolean;
     loadAgreements: () => Promise<AgreementSummary[]>;
@@ -37,8 +37,7 @@ type UseAgreementCommandsResult = {
 };
 
 export const useAgreementCommands = ({
-    apiBaseUrl,
-    buildHeaders,
+    api,
     identity,
     isManualSettlementTriggerEnabled,
     loadAgreements,
@@ -108,27 +107,16 @@ export const useAgreementCommands = ({
         setError(null);
 
         try {
-            const createPayload = {
-                merchantId: identity.merchantId ?? '',
-                partnerId: form.partnerId,
-                amount: Number(form.amount),
-            };
-            const response = await fetch(`${apiBaseUrl}/agreements`, {
-                method: 'POST',
-                headers: buildHeaders({
-                    'Content-Type': 'application/json',
-                    'Idempotency-Key': idempotencyKey,
-                }),
-                body: JSON.stringify(createPayload),
-            });
+            const createResult = await api.createAgreement(
+                {
+                    merchantId: identity.merchantId ?? '',
+                    partnerId: form.partnerId,
+                    amount: Number(form.amount),
+                },
+                idempotencyKey,
+            );
 
-            const body = (await response.json()) as AgreementResult | { message: string };
-
-            if (!response.ok) {
-                throw new Error('message' in body ? body.message : 'Request failed');
-            }
-
-            setResult(body as AgreementResult);
+            setResult(createResult);
             setIdempotencyKey(crypto.randomUUID());
             setIsSubmitting(false);
             void loadAgreements();
@@ -160,21 +148,9 @@ export const useAgreementCommands = ({
         setActiveAction(mapKey);
 
         try {
-            const response = await fetch(`${apiBaseUrl}/agreements/${agreement.agreementId}/${action}`, {
-                method: 'POST',
-                headers: buildHeaders({
-                    'Idempotency-Key': key,
-                }),
-            });
-
-            const body = (await response.json()) as AgreementResult | { message: string };
-
-            if (!response.ok) {
-                throw new Error('message' in body ? body.message : 'Request failed');
-            }
+            const resultBody = await api.transitionAgreement(agreement.agreementId, action, key);
 
             setActionKeys((current) => ({ ...current, [mapKey]: key }));
-            const resultBody = body as AgreementResult;
             setResult(resultBody);
             if (resultBody.agreementId && resultBody.newStatus) {
                 updateAgreementStatus(resultBody.agreementId, resultBody.newStatus as AgreementSummary['status']);

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionIdentity } from '../../../shared/auth-contract';
 import type { AgreementSummary, EventRecord, LedgerEntry } from '../types';
+import type { WorkflowApi } from './workflowApi';
 
 type UseWorkflowDataArgs = {
-    apiBaseUrl: string;
-    buildHeaders: (headers?: Record<string, string>) => Record<string, string>;
+    api: WorkflowApi;
     identity: SessionIdentity | null;
     sessionAccessToken: string | null;
 };
@@ -26,12 +26,7 @@ type UseWorkflowDataResult = {
     updateAgreementStatus: (agreementId: string, status: AgreementSummary['status']) => void;
 };
 
-export const useWorkflowData = ({
-    apiBaseUrl,
-    buildHeaders,
-    identity,
-    sessionAccessToken,
-}: UseWorkflowDataArgs): UseWorkflowDataResult => {
+export const useWorkflowData = ({ api, identity, sessionAccessToken }: UseWorkflowDataArgs): UseWorkflowDataResult => {
     const [agreements, setAgreements] = useState<AgreementSummary[]>([]);
     const [agreementsError, setAgreementsError] = useState<string | null>(null);
     const [events, setEvents] = useState<EventRecord[]>([]);
@@ -45,23 +40,14 @@ export const useWorkflowData = ({
     const loadAgreements = useCallback(async (): Promise<AgreementSummary[]> => {
         setIsLoadingAgreements(true);
         try {
-            const response = await fetch(`${apiBaseUrl}/agreements?limit=10`, {
-                headers: buildHeaders(),
-            });
-            const body = (await response.json()) as { agreements?: AgreementSummary[]; message?: string };
-
-            if (!response.ok) {
-                throw new Error(body.message ?? 'Failed to load agreements');
-            }
-
-            const nextAgreements = body.agreements ?? [];
+            const nextAgreements = await api.listAgreements();
             setAgreements(nextAgreements);
             setAgreementsError(null);
             return nextAgreements;
         } finally {
             setIsLoadingAgreements(false);
         }
-    }, [apiBaseUrl, buildHeaders]);
+    }, [api]);
 
     const updateAgreementStatus = useCallback((agreementId: string, status: AgreementSummary['status']) => {
         setAgreements((prev) => prev.map((a) => (a.agreementId === agreementId ? { ...a, status } : a)));
@@ -70,44 +56,26 @@ export const useWorkflowData = ({
     const loadEvents = useCallback(async (): Promise<EventRecord[]> => {
         setIsLoadingEvents(true);
         try {
-            const response = await fetch(`${apiBaseUrl}/debug/events?limit=10`, {
-                headers: buildHeaders(),
-            });
-            const body = (await response.json()) as { events?: EventRecord[]; message?: string };
-
-            if (!response.ok) {
-                throw new Error(body.message ?? 'Failed to load events');
-            }
-
-            const nextEvents = body.events ?? [];
+            const nextEvents = await api.listEvents();
             setEvents(nextEvents);
             setEventsError(null);
             return nextEvents;
         } finally {
             setIsLoadingEvents(false);
         }
-    }, [apiBaseUrl, buildHeaders]);
+    }, [api]);
 
     const loadLedger = useCallback(async (): Promise<LedgerEntry[]> => {
         setIsLoadingLedger(true);
         try {
-            const response = await fetch(`${apiBaseUrl}/ledger?limit=10`, {
-                headers: buildHeaders(),
-            });
-            const body = (await response.json()) as { entries?: LedgerEntry[]; message?: string };
-
-            if (!response.ok) {
-                throw new Error(body.message ?? 'Failed to load ledger');
-            }
-
-            const nextEntries = body.entries ?? [];
+            const nextEntries = await api.listLedger();
             setLedgerEntries(nextEntries);
             setLedgerError(null);
             return nextEntries;
         } finally {
             setIsLoadingLedger(false);
         }
-    }, [apiBaseUrl, buildHeaders]);
+    }, [api]);
 
     useEffect(() => {
         if (!sessionAccessToken || !identity) {

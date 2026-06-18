@@ -8,6 +8,7 @@ import type { AgreementSummary, TransitionAction } from './types';
 import { buildAuthHeaders } from './workflow/api';
 import { useAgreementCommands } from './workflow/useAgreementCommands';
 import { useWorkflowData } from './workflow/useWorkflowData';
+import { createWorkflowApi } from './workflow/workflowApi';
 
 export default function App() {
     const apiBaseUrl = useMemo(() => {
@@ -36,6 +37,7 @@ export default function App() {
         (headers: Record<string, string> = {}) => buildAuthHeaders(session, headers),
         [session],
     );
+    const workflowApi = useMemo(() => createWorkflowApi({ apiBaseUrl, buildHeaders }), [apiBaseUrl, buildHeaders]);
     const {
         agreements,
         agreementsError,
@@ -52,8 +54,7 @@ export default function App() {
         refresh,
         updateAgreementStatus,
     } = useWorkflowData({
-        apiBaseUrl,
-        buildHeaders,
+        api: workflowApi,
         identity,
         sessionAccessToken: session?.access_token ?? null,
     });
@@ -71,8 +72,7 @@ export default function App() {
         runCreateAgreement,
         runTransition,
     } = useAgreementCommands({
-        apiBaseUrl,
-        buildHeaders,
+        api: workflowApi,
         identity,
         isManualSettlementTriggerEnabled,
         loadAgreements,
