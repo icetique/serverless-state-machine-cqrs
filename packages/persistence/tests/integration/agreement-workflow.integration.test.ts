@@ -58,8 +58,6 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
         const approveHash = hashRequest({ agreementId: publicId, eventType: 'AgreementApproved' });
         const approved = await repository.transitionAgreement({
             agreementId: publicId,
-            expectedCurrentStatus: 'CREATED',
-            nextStatus: 'APPROVED',
             eventType: 'AgreementApproved',
             idempotencyKey: approveKey,
             requestHash: approveHash,
@@ -77,8 +75,6 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
 
         const funded = await repository.transitionAgreement({
             agreementId: publicId,
-            expectedCurrentStatus: 'APPROVED',
-            nextStatus: 'FUNDED',
             eventType: 'AgreementFunded',
             idempotencyKey: `idem_fund_${randomUUID()}`,
             requestHash: hashRequest({ agreementId: publicId, eventType: 'AgreementFunded' }),
@@ -176,8 +172,6 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
         const requestHash = hashRequest({ agreementId: publicId, eventType: 'AgreementApproved' });
         const transition = {
             agreementId: publicId,
-            expectedCurrentStatus: 'CREATED' as const,
-            nextStatus: 'APPROVED' as const,
             eventType: 'AgreementApproved' as const,
             idempotencyKey,
             requestHash,

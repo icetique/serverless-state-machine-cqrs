@@ -153,14 +153,14 @@ describe('WorkflowDashboard', () => {
             });
 
             expect(screen.getByRole('heading', { name: 'Ledger' })).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: 'Event Stream' })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Event Store' })).toBeInTheDocument();
         });
 
         it('hides ledger and event stream panels for non-admin', () => {
             renderDashboard({ identity: partnerIdentity });
 
             expect(screen.queryByRole('heading', { name: 'Ledger' })).not.toBeInTheDocument();
-            expect(screen.queryByRole('heading', { name: 'Event Stream' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'Event Store' })).not.toBeInTheDocument();
         });
 
         it('shows loading states for admin panels while fetching', () => {
@@ -197,7 +197,7 @@ describe('WorkflowDashboard', () => {
             });
 
             expect(screen.getByText('No ledger entries yet.')).toBeInTheDocument();
-            expect(screen.getByText('No persisted events yet.')).toBeInTheDocument();
+            expect(screen.getByText('No event store rows yet.')).toBeInTheDocument();
         });
     });
 });

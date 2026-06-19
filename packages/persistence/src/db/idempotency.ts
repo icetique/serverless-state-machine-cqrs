@@ -49,7 +49,7 @@ export const insertIdempotencyKey = async (
         requestHash: string;
         responseStatusCode: number;
         responseBody: string;
-        agreementId: number;
+        streamId: string;
     },
 ): Promise<void> => {
     await client.query(
@@ -60,7 +60,7 @@ export const insertIdempotencyKey = async (
                 request_hash,
                 response_status_code,
                 response_body,
-                agreement_id
+                stream_id
             )
             VALUES ($1, $2, $3, $4, $5, $6)
         `,
@@ -70,7 +70,7 @@ export const insertIdempotencyKey = async (
             values.requestHash,
             values.responseStatusCode,
             values.responseBody,
-            values.agreementId,
+            values.streamId,
         ],
     );
 };

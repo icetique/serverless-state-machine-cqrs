@@ -3,21 +3,26 @@ import { PostgresEventStreamReadRepository } from '../../src/repository';
 import { type Queryable } from '../../src/lambda-utils';
 
 describe('PostgresEventStreamReadRepository', () => {
-    it('maps debug event rows', async () => {
+    it('maps event_store rows', async () => {
         const queryMock: Queryable['query'] = async <Row>() => ({
             rows: [
                 {
                     id: 1,
-                    agreement_id: 'agr_123',
+                    stream_id: 'agr_123',
+                    stream_version: 1,
                     event_type: 'AgreementCreated',
-                    previous_status: null,
-                    new_status: 'CREATED',
-                    actor_id: 'merchant_1',
-                    actor_type: 'merchant',
-                    request_id: 'req_1',
-                    idempotency_key: 'idem_1',
-                    payload: { agreementId: 'agr_123' },
-                    created_at: '2026-06-04T11:00:00.000Z',
+                    payload: {
+                        agreementId: 'agr_123',
+                        previousStatus: null,
+                        newStatus: 'CREATED',
+                    },
+                    metadata: {
+                        actor_id: 'merchant_1',
+                        actor_type: 'merchant',
+                        request_id: 'req_1',
+                        idempotency_key: 'idem_1',
+                    },
+                    occurred_at: '2026-06-04T11:00:00.000Z',
                 } as unknown as Row,
             ],
         });
@@ -29,10 +34,11 @@ describe('PostgresEventStreamReadRepository', () => {
         const repository = new PostgresEventStreamReadRepository(pool);
         const result = await repository.listEvents({ limit: 25, agreementId: 'agr_123' });
 
-        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM agreement_events'), [25, 'agr_123']);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM event_store'), [25, 'agr_123']);
         expect(result).toEqual([
             {
                 id: 1,
+                streamVersion: 1,
                 agreementId: 'agr_123',
                 eventType: 'AgreementCreated',
                 previousStatus: null,
@@ -41,7 +47,11 @@ describe('PostgresEventStreamReadRepository', () => {
                 actorType: 'merchant',
                 requestId: 'req_1',
                 idempotencyKey: 'idem_1',
-                payload: { agreementId: 'agr_123' },
+                payload: {
+                    agreementId: 'agr_123',
+                    previousStatus: null,
+                    newStatus: 'CREATED',
+                },
                 createdAt: '2026-06-04T11:00:00.000Z',
             },
         ]);

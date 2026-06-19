@@ -16,14 +16,16 @@ export interface CreateAgreementCommand {
 
 export interface TransitionAgreementCommand {
     agreementId: string;
-    expectedCurrentStatus: import('../events/agreement-events').AgreementStatus;
-    nextStatus: import('../events/agreement-events').AgreementStatus;
-    eventType: import('../events/agreement-events').AgreementEventType;
+    eventType: Exclude<
+        import('../events/agreement-events').AgreementEventType,
+        'AgreementCreated' | 'AgreementSettled'
+    >;
     idempotencyKey: string;
     requestHash: string;
     requestId: string;
     actorId: string;
     actorType: ActorType;
+    expectedVersion?: number;
 }
 
 export interface SettleAgreementCommand {

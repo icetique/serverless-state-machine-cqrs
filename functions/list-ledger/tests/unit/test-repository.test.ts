@@ -22,7 +22,8 @@ describe('PostgresLedgerReadRepository', () => {
 
         const result = await new PostgresLedgerReadRepository(pool).listEntries(10);
 
-        expect(query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY ledger_entries.id DESC'), [10]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM ledger_read_model'), [10]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY id DESC'), [10]);
         expect(result).toEqual([
             {
                 transactionId: 'txn_123',

@@ -94,17 +94,22 @@ export const createHandler = (
                           actorId: authContext.subject,
                           actorType: authContext.role,
                       })
-                    : await repository.transitionAgreement({
-                          agreementId,
-                          expectedCurrentStatus: transitionConfig.expectedCurrentStatus,
-                          nextStatus: transitionConfig.nextStatus,
-                          eventType: transitionConfig.eventType,
-                          idempotencyKey,
-                          requestHash: hashTransitionRequest(agreementId, transitionConfig.eventType),
-                          requestId: event.requestContext.requestId ?? 'local-request',
-                          actorId: authContext.subject,
-                          actorType: authContext.role,
-                      });
+                    : await (async () => {
+                          const { eventType } = transitionConfig;
+                          if (eventType !== 'AgreementApproved' && eventType !== 'AgreementFunded') {
+                              throw new Error(`Unsupported HTTP transition event type: ${eventType}`);
+                          }
+
+                          return repository.transitionAgreement({
+                              agreementId,
+                              eventType,
+                              idempotencyKey,
+                              requestHash: hashTransitionRequest(agreementId, eventType),
+                              requestId: event.requestContext.requestId ?? 'local-request',
+                              actorId: authContext.subject,
+                              actorType: authContext.role,
+                          });
+                      })();
 
             return mapTransitionAgreementResult(result, transitionConfig.nextStatus);
         } catch (error) {

@@ -29,6 +29,7 @@ describe('Debug events handler', () => {
         repository.listEvents.mockResolvedValue([
             {
                 id: 10,
+                streamVersion: 1,
                 agreementId: 'agr_123',
                 eventType: 'AgreementCreated',
                 previousStatus: null,
@@ -51,6 +52,7 @@ describe('Debug events handler', () => {
             events: [
                 {
                     id: 10,
+                    streamVersion: 1,
                     agreementId: 'agr_123',
                     eventType: 'AgreementCreated',
                     previousStatus: null,

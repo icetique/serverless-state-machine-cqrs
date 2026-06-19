@@ -26,7 +26,7 @@ describe('PostgresAgreementsReadRepository', () => {
             role: 'admin',
         });
 
-        expect(query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY id DESC'), [10]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM agreements_read_model'), [10]);
         expect(result).toEqual([
             {
                 agreementId: 'agr_123',

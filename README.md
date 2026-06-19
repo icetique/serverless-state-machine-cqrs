@@ -3,19 +3,19 @@
 CQRS and event-sourced agreement settlement workflow built with AWS SAM, Lambda, API Gateway, PostgreSQL, Supabase Auth, and a Vite UI.
 
 > **Upstream reference:** [serverless-state-machine](https://github.com/icetique/serverless-state-machine) — CRUD + transactional outbox + deployed demo.  
-> **This repo:** experimental rewrite toward event-sourced writes, read-model projections, and explicit command/query separation.
+> **This repo:** event-sourced writes (`event_store` as source of truth), synchronous read-model projections, and explicit command/query separation.
 
 ## What it does
 
 - Creates agreements between a merchant and a partner
 - Enforces the state machine: `CREATED -> APPROVED -> FUNDED -> SETTLED`
-- Persists audit history in `agreement_events`
-- Persists settlement bookings in `ledger_entries`
-- Persists domain events to `outbox_events` and dispatches them asynchronously
+- Appends domain events to `event_store` (one stream per agreement `public_id`)
+- Projects `agreements_read_model` and `ledger_read_model` inside the same command transaction
+- Persists integration events to `outbox_events` and dispatches them asynchronously
 - Settles funded agreements via **EventBridge → SQS → Lambda** (not synchronous HTTP)
 - Uses idempotency keys to make command retries safe
 - Shares JWT auth and RBAC helpers through a dedicated Lambda layer
-- Exposes a local UI for workflow execution, Supabase-backed sign-in, events, and ledger visibility
+- Exposes a local UI for workflow execution, Supabase-backed sign-in, event store inspection, and ledger visibility
 - Includes a `SettlementProcessorFunction` that consumes settlement work from SQS-shaped input
 
 ## Repository layout
@@ -41,7 +41,7 @@ serverless-state-machine-cqrs/
 ├── layers/lambda-utils/            # Lambda layer: auth helpers + domain/persistence runtime packages
 ├── shared/                         # Compile-time auth contract for the UI only
 ├── tests/fixtures/http-api/        # Shared Lambda test fixtures (API Gateway events)
-├── db/migrations/                  # Postgres schema migrations
+├── db/migrations/                  # Event-sourced Postgres schema (event_store + read models)
 ├── docs/                           # Supabase setup, AWS migration notes
 ├── events/                         # SAM invoke fixtures (e.g. SQS settlement event)
 ├── scripts/                        # smoke tests and local layer checks
@@ -88,37 +88,45 @@ If you are reviewing for production hardening, the highest-value next steps woul
 - `apps/ui/`
     - Vite/React frontend for role-scoped workflow operation
 - `db/migrations/`
-    - schema for agreements, audit history, idempotency, and ledger
+    - `event_store`, `agreements_read_model`, `ledger_read_model`, idempotency, outbox
 - `layers/lambda-utils/`
     - shared auth helpers and HTTP utilities mounted into API Lambdas as a Lambda layer
     - compiled `@serverless-state-machine-cqrs/domain` and `@serverless-state-machine-cqrs/persistence` packages for SAM runtime
 
 ## Command vs query boundaries
 
-Phase 1 makes the CQRS split explicit in code and imports:
+Commands append to `event_store` and update read models in one transaction. Queries read projections or the event log only.
 
-| Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                |
-| ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — create, transition, settle in one transaction with `agreement_events` + `outbox_events` |
-| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` only — no command repository imports                                                                                  |
+| Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                                       |
+| ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — replay stream, `decide`, append events, project `agreements_read_model` / `ledger_read_model`, `outbox_events` |
+| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` from read models or `event_store` — no command repository imports                                                                            |
 
-**Domain package** (`packages/domain/`) holds aggregate types, command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
+**Domain package** (`packages/domain/`) holds aggregate replay (`Agreement.fromEvents`, `decide`), command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
 
-**Persistence package** (`packages/persistence/`) holds the merged `PostgresAgreementCommandRepository` used by all write handlers. It is built into the Lambda layer alongside `lambda-utils` (`npm run build:layer`).
+**Persistence package** (`packages/persistence/`) implements the event-sourced `PostgresAgreementCommandRepository`. It is built into the Lambda layer alongside `lambda-utils` (`npm run build:layer`).
 
-**Import rule:** if a file lives under a query Lambda, it must not import `@serverless-state-machine-cqrs/persistence`. Command Lambdas must not embed SQL for read models. Root `npm test` runs `scripts/check-query-boundaries.mjs` to enforce this.
+**Import rule:** if a file lives under a query Lambda, it must not import `@serverless-state-machine-cqrs/persistence`. Command Lambdas must not embed SQL for read models. Root `npm test` runs `scripts/check-query-boundaries.mjs` and `scripts/check-no-crud-writes.mjs` to enforce this.
+
+### vs upstream (CRUD demo)
+
+| Concern             | Upstream `serverless-state-machine` | This repo                                       |
+| ------------------- | ----------------------------------- | ----------------------------------------------- |
+| Source of truth     | Mutable `agreements.status`         | Append-only `event_store` per agreement stream  |
+| History             | `agreement_events` audit dual-write | Canonical events in `event_store`               |
+| List / ledger reads | `agreements`, `ledger_entries`      | `agreements_read_model`, `ledger_read_model`    |
+| Write path          | `UPDATE agreements` + audit insert  | Replay + `decide` + append + sync projections   |
+| Concurrency         | Row lock + expected status          | Stream replay (HTTP `expectedVersion` deferred) |
 
 ### Approve, fund, and settle as separate Lambdas
 
-`template.yaml` defines three HTTP transition functions (`ApproveAgreementFunction`, `FundAgreementFunction`, `SettleAgreementFunction`) that share one handler package but receive different env vars (`TRANSITION_EVENT_TYPE`, `EXPECTED_CURRENT_STATUS`, `NEXT_STATUS`). This is intentional:
+`template.yaml` defines three HTTP transition functions (`ApproveAgreementFunction`, `FundAgreementFunction`, `SettleAgreementFunction`) that share one handler package but receive different env vars (`TRANSITION_EVENT_TYPE`). This is intentional:
 
 - **Independent deploy and scaling** — approve/fund/settle can be tuned separately (memory, concurrency, alarms).
 - **Least-privilege IAM** — each route maps to one Lambda; no runtime action dispatch table in a single fat handler.
 - **SAM/IaC clarity** — one API route per function matches the OpenAPI surface.
 
-Domain rules stay centralized in `packages/domain` (`validateTransition`, `assertTransitionConfig`). Merging into one transition Lambda would save cold starts but re-couple scaling and deployment; keep three functions unless operational requirements change.
-
-Behaviour is unchanged from upstream for Phase 1: `agreements.status` is still updated directly; dual-write to `agreement_events` remains. Phase 2 replaces the mutable row with event-store authority.
+Domain rules stay centralized in `packages/domain` (`validateTransition`, `assertTransitionConfig`). The repository loads the agreement stream and calls `Agreement.decide`; env vars select which event type to append, not which row status to expect.
 
 ## Async settlement (SQS)
 
@@ -128,7 +136,7 @@ After `POST /agreements/{id}/fund`, settlement is **not** done in the HTTP respo
 create / approve / fund (HTTP Lambda)
         │
         ▼
-  outbox_events + agreement row          (same Postgres transaction)
+  event_store + read models + outbox     (same Postgres transaction)
         │
         ▼
   OutboxDispatcherFunction                 (scheduled; publishes pending rows)
@@ -140,12 +148,12 @@ create / approve / fund (HTTP Lambda)
   settlement-queue (SQS, name: `{StackName}-settlement-queue`)   (DLQ: `{StackName}-settlement-dlq` after 3 receives)
         │
         ▼
-  SettlementProcessorFunction            (SQS trigger; FUNDED → SETTLED + ledger)
+  SettlementProcessorFunction            (SQS trigger; appends Settled + ledger projection)
 ```
 
 Infrastructure is defined in `template.yaml`: `SettlementQueue`, `FundedEventRule`, `SettlementProcessorFunction`, and `OutboxDispatcherFunction`.
 
-- **Deployed:** fund returns once the agreement is `FUNDED`; the UI polls until `SETTLED` (~outbox dispatch interval + SQS/Lambda latency).
+- **Deployed:** fund returns once `agreements_read_model` shows `FUNDED`; the UI polls until `SETTLED` (~outbox dispatch interval + SQS/Lambda latency).
 - **Local API (`sam local start-api`):** HTTP workflow works, but SQS is not wired automatically — use `sam local invoke OutboxDispatcherFunction` and `SettlementProcessorFunction` (or `npm run smoke:async-retry`) to exercise the async path.
 - **Manual settle:** `POST /agreements/{id}/settle` exists but is off by default (`ENABLE_MANUAL_SETTLEMENT_TRIGGER=false`).
 
@@ -161,7 +169,7 @@ Prerequisites:
 - Node.js
 - SAM CLI
 
-Run migrations (loads `DATABASE_URL` from `.env` automatically):
+Run migrations (loads `DATABASE_URL` from `.env` automatically). **First time on Phase 2 schema:** reset the CQRS Supabase app schema (see [docs/supabase-setup.md](docs/supabase-setup.md#database-reset-phase-2-event-sourced-schema)), then:
 
 ```bash
 cp .env.example .env   # first time only
@@ -265,13 +273,15 @@ node scripts/smoke-async-retry.mjs
 npm run verify
 ```
 
-Runs Prettier, `sam validate --lint`, TypeScript, ESLint (`lint:check`), and unit tests (including `check:query-boundaries`).
+Runs Prettier, `sam validate --lint`, TypeScript, ESLint (`lint:check`), `check:no-crud-writes`, and unit tests (including `check:query-boundaries`).
 
 `npm run verify:full` runs `verify` then prompts for Postgres integration tests (see below).
 
 ### Postgres integration tests
 
-**Not safe on production.** Tests call the real command repository and **insert** agreements, audit events, outbox rows, ledger entries, and idempotency keys. Rows are **not** deleted afterward (IDs like `agr_int_*`, `agr_idem_*`).
+**Not safe on production.** Tests call the real command repository and **append** to `event_store`, read models, outbox rows, and idempotency keys. Rows are **not** deleted afterward (IDs like `agr_int_*`, `agr_idem_*`).
+
+Requires a database migrated with `npm run migrate:up` on the Phase 2 baseline (`0001_event_sourced_baseline.js`). Reset an old Phase 1 schema before running (see [docs/supabase-setup.md](docs/supabase-setup.md#database-reset-phase-2-event-sourced-schema)).
 
 1. Set `INTEGRATION_DATABASE_URL` in `.env` to a **dedicated non-production** database (local Postgres or a throwaway Supabase project).
 2. Do **not** point this at `DATABASE_URL` for a production or shared demo DB unless you accept test junk in that database.
@@ -335,25 +345,25 @@ cd apps/ui && npm run build
 
 ## Available commands
 
-| Command                         | Description                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `npm run verify`                | Local pre-push gate: Prettier, SAM/cfn-lint, typecheck, ESLint, unit tests + query boundaries |
-| `npm run verify:full`           | `verify` then interactive Postgres integration tests (`INTEGRATION_DATABASE_URL`)             |
-| `npm test`                      | Run all Lambda package and UI unit tests (no Postgres)                                        |
-| `npm run test:integration`      | Postgres integration tests — **writes rows**; prompts for confirmation; not for production    |
-| `npm run test:coverage`         | Run Lambda + UI tests with coverage                                                           |
-| `npm run test:e2e`              | Playwright e2e (manual; needs local stack + `VITE_DEMO_*`)                                    |
-| `npm run typecheck`             | Type-check all Lambda packages and the UI                                                     |
-| `npm run lint`                  | ESLint all Lambda packages and UI (auto-fix)                                                  |
-| `npm run lint:check`            | ESLint without writing fixes (included in `verify`)                                           |
-| `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`) |
-| `npm run format`                | Format all files with Prettier                                                                |
-| `npm run format:check`          | Check formatting without writing                                                              |
-| `npm run build:layer`           | Compile the shared Lambda layer                                                               |
-| `npm run migrate:up`            | Apply pending database migrations                                                             |
-| `npm run migrate:down`          | Roll back the last migration                                                                  |
-| `npm run migrate:create`        | Scaffold a new migration file                                                                 |
-| `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test                                                     |
-| `cd apps/ui && npm run dev`     | Start the Vite dev server                                                                     |
-| `cd apps/ui && npm run build`   | Build the UI for production                                                                   |
-| `cd apps/ui && npm run preview` | Preview the production build locally                                                          |
+| Command                         | Description                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `npm run verify`                | Local pre-push gate: Prettier, SAM/cfn-lint, typecheck, ESLint, no-CRUD check, unit tests + query boundaries |
+| `npm run verify:full`           | `verify` then interactive Postgres integration tests (`INTEGRATION_DATABASE_URL`)                            |
+| `npm test`                      | Run all Lambda package and UI unit tests (no Postgres)                                                       |
+| `npm run test:integration`      | Postgres integration tests — **writes rows**; prompts for confirmation; not for production                   |
+| `npm run test:coverage`         | Run Lambda + UI tests with coverage                                                                          |
+| `npm run test:e2e`              | Playwright e2e (manual; needs local stack + `VITE_DEMO_*`)                                                   |
+| `npm run typecheck`             | Type-check all Lambda packages and the UI                                                                    |
+| `npm run lint`                  | ESLint all Lambda packages and UI (auto-fix)                                                                 |
+| `npm run lint:check`            | ESLint without writing fixes (included in `verify`)                                                          |
+| `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`)                |
+| `npm run format`                | Format all files with Prettier                                                                               |
+| `npm run format:check`          | Check formatting without writing                                                                             |
+| `npm run build:layer`           | Compile the shared Lambda layer                                                                              |
+| `npm run migrate:up`            | Apply pending database migrations                                                                            |
+| `npm run migrate:down`          | Roll back the last migration                                                                                 |
+| `npm run migrate:create`        | Scaffold a new migration file                                                                                |
+| `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test                                                                    |
+| `cd apps/ui && npm run dev`     | Start the Vite dev server                                                                                    |
+| `cd apps/ui && npm run build`   | Build the UI for production                                                                                  |
+| `cd apps/ui && npm run preview` | Preview the production build locally                                                                         |

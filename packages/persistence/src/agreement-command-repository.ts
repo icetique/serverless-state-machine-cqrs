@@ -1,24 +1,23 @@
+import { randomUUID } from 'crypto';
 import type {
     CreateAgreementCommand,
     SettleAgreementCommand,
     TransitionAgreementCommand,
 } from '@serverless-state-machine-cqrs/domain';
+import { decideCreate, decideSettlement, decideTransition, fromEvents } from '@serverless-state-machine-cqrs/domain';
 import type { TransactionPool } from '@serverless-state-machine-cqrs/db-ports';
-import {
-    applyAgreementTransition,
-    insertSettlementLedgerEntry,
-    settlementPayloadExtension,
-} from './apply-agreement-transition';
+import { insertEventStoreRow } from './event-store/append-event';
+import { loadStreamEvents, lockAgreementReadModel } from './event-store/load-stream';
+import { projectAgreementEvent, projectLedgerEvent } from './projections/read-models';
 import {
     type AgreementLookup,
     type AgreementRecord,
-    type AgreementRow,
     type CreateAgreementResult,
     type TransitionAgreementResult,
-    mapAgreementRow,
+    type TransitionPayload,
 } from './agreement-types';
 import { checkIdempotency, insertIdempotencyKey } from './db/idempotency';
-import { insertAgreementEvent, insertOutboxEvent } from './db/writers';
+import { insertOutboxEvent } from './db/writers';
 
 export type {
     AgreementLookup,
@@ -35,7 +34,74 @@ export interface AgreementCommandRepository {
     settleAgreement(command: SettleAgreementCommand): Promise<TransitionAgreementResult>;
 }
 
+interface ReadModelRow {
+    public_id: string;
+    status: AgreementLookup['status'];
+    merchant_id: string;
+    partner_id: string;
+    amount: string;
+}
+
 const parseAgreementRecord = (body: string): AgreementRecord => JSON.parse(body) as AgreementRecord;
+const parseTransitionPayload = (body: string): TransitionPayload => JSON.parse(body) as TransitionPayload;
+
+const toAgreementRecord = (payload: TransitionPayload): AgreementRecord => ({
+    agreementId: payload.agreementId,
+    status: payload.newStatus,
+    merchantId: payload.merchantId,
+    partnerId: payload.partnerId,
+    amount: payload.amount,
+});
+
+const persistAppendedEvent = async (
+    client: Parameters<typeof insertEventStoreRow>[0],
+    input: {
+        streamId: string;
+        operationType: string;
+        requestHash: string;
+        requestId: string;
+        actorId: string;
+        actorType: CreateAgreementCommand['actorType'];
+        idempotencyKey: string;
+        event: import('@serverless-state-machine-cqrs/domain').StreamEventRecord;
+        responseStatusCode: number;
+    },
+): Promise<TransitionPayload> => {
+    const { event } = input;
+
+    await insertEventStoreRow(client, {
+        streamId: input.streamId,
+        event,
+        actorId: input.actorId,
+        actorType: input.actorType,
+        requestId: input.requestId,
+        idempotencyKey: input.idempotencyKey,
+    });
+
+    await projectAgreementEvent(client, event);
+    await projectLedgerEvent(client, event);
+
+    const responseBody = JSON.stringify(event.payload);
+
+    await insertIdempotencyKey(client, {
+        idempotencyKey: input.idempotencyKey,
+        operationType: input.operationType,
+        requestHash: input.requestHash,
+        responseStatusCode: input.responseStatusCode,
+        responseBody,
+        streamId: input.streamId,
+    });
+
+    await insertOutboxEvent(client, {
+        aggregateId: event.payload.agreementId,
+        eventType: event.eventType,
+        payload: responseBody,
+        requestId: input.requestId,
+        idempotencyKey: input.idempotencyKey,
+    });
+
+    return event.payload;
+};
 
 export class PostgresAgreementCommandRepository implements AgreementCommandRepository {
     constructor(private readonly pool: TransactionPool) {}
@@ -64,56 +130,35 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
                 return { kind: 'replayed', agreement: idempotency.value };
             }
 
-            const insertedAgreement = await client.query<AgreementRow>(
-                `
-                    INSERT INTO agreements (public_id, status, merchant_id, partner_id, amount)
-                    VALUES ($1, 'CREATED', $2, $3, $4)
-                    RETURNING id, public_id, status, merchant_id, partner_id, amount
-                `,
-                [command.publicId, command.merchantId, command.partnerId, command.amount],
-            );
-
-            const row = insertedAgreement.rows[0];
-            const agreement = mapAgreementRow(row);
-            const responseBody = JSON.stringify(agreement);
-
-            await insertAgreementEvent(client, {
-                agreementId: row.id,
-                eventType: 'AgreementCreated',
-                previousStatus: null,
-                newStatus: agreement.status,
-                actorId: command.actorId,
-                actorType: command.actorType,
-                requestId: command.requestId,
-                idempotencyKey: command.idempotencyKey,
-                payload: responseBody,
+            const streamEvents = await loadStreamEvents(client, command.publicId);
+            const aggregate = fromEvents(streamEvents);
+            const decision = decideCreate(aggregate, {
+                agreementId: command.publicId,
+                merchantId: command.merchantId,
+                partnerId: command.partnerId,
+                amount: command.amount,
             });
 
-            await insertIdempotencyKey(client, {
-                idempotencyKey: command.idempotencyKey,
+            if (decision.kind === 'stream_exists') {
+                await client.query('ROLLBACK', []);
+                return { kind: 'conflict' };
+            }
+
+            const payload = await persistAppendedEvent(client, {
+                streamId: command.publicId,
                 operationType: 'create_agreement',
                 requestHash: command.requestHash,
-                responseStatusCode: 201,
-                responseBody,
-                agreementId: row.id,
-            });
-
-            await insertOutboxEvent(client, {
-                aggregateId: agreement.agreementId,
-                eventType: 'AgreementCreated',
-                payload: JSON.stringify({
-                    agreementId: agreement.agreementId,
-                    merchantId: agreement.merchantId,
-                    partnerId: agreement.partnerId,
-                    amount: agreement.amount,
-                    previousStatus: null,
-                    newStatus: 'CREATED',
-                }),
                 requestId: command.requestId,
+                actorId: command.actorId,
+                actorType: command.actorType,
                 idempotencyKey: command.idempotencyKey,
+                event: decision.event,
+                responseStatusCode: 201,
             });
 
             await client.query('COMMIT', []);
+
+            const agreement = toAgreementRecord(payload);
 
             return {
                 kind: 'created',
@@ -132,10 +177,10 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
         const client = await this.pool.connect();
 
         try {
-            const agreement = await client.query<AgreementRow>(
+            const agreement = await client.query<ReadModelRow>(
                 `
-                    SELECT id, public_id, status, merchant_id, partner_id, amount
-                    FROM agreements
+                    SELECT public_id, status, merchant_id, partner_id, amount
+                    FROM agreements_read_model
                     WHERE public_id = $1
                 `,
                 [agreementId],
@@ -157,26 +202,73 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
     }
 
     async transitionAgreement(command: TransitionAgreementCommand): Promise<TransitionAgreementResult> {
-        if (command.eventType === 'AgreementSettled') {
-            throw new Error('Settlement must use settleAgreement');
-        }
-
         const client = await this.pool.connect();
 
         try {
             await client.query('BEGIN', []);
 
-            return await applyAgreementTransition({
+            const idempotency = await checkIdempotency(
                 client,
-                agreementId: command.agreementId,
-                eventType: command.eventType,
-                idempotencyKey: command.idempotencyKey,
+                command.idempotencyKey,
+                command.eventType,
+                command.requestHash,
+                (row) => parseTransitionPayload(row.response_body),
+            );
+
+            if (idempotency.kind === 'conflict') {
+                await client.query('COMMIT', []);
+                return { kind: 'conflict' };
+            }
+
+            if (idempotency.kind === 'replayed') {
+                await client.query('COMMIT', []);
+                return { kind: 'replayed', payload: idempotency.value };
+            }
+
+            const hasReadModel = await lockAgreementReadModel(client, command.agreementId);
+            const streamEvents = await loadStreamEvents(client, command.agreementId);
+            const aggregate = fromEvents(streamEvents);
+
+            if (!hasReadModel && !aggregate.state) {
+                await client.query('COMMIT', []);
+                return { kind: 'not_found' };
+            }
+
+            const decision = decideTransition(aggregate, command.eventType, command.expectedVersion);
+
+            if (decision.kind === 'not_found') {
+                await client.query('COMMIT', []);
+                return { kind: 'not_found' };
+            }
+
+            if (decision.kind === 'invalid_transition') {
+                await client.query('COMMIT', []);
+                return { kind: 'invalid_transition', currentStatus: decision.currentStatus };
+            }
+
+            if (decision.kind === 'version_conflict') {
+                await client.query('COMMIT', []);
+                return { kind: 'conflict' };
+            }
+
+            const payload = await persistAppendedEvent(client, {
+                streamId: command.agreementId,
+                operationType: command.eventType,
                 requestHash: command.requestHash,
                 requestId: command.requestId,
                 actorId: command.actorId,
                 actorType: command.actorType,
-                expectedCurrentStatus: command.expectedCurrentStatus,
+                idempotencyKey: command.idempotencyKey,
+                event: decision.event,
+                responseStatusCode: 200,
             });
+
+            await client.query('COMMIT', []);
+
+            return {
+                kind: 'transitioned',
+                payload,
+            };
         } catch (error) {
             await client.query('ROLLBACK', []);
             throw error;
@@ -191,19 +283,69 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
         try {
             await client.query('BEGIN', []);
 
-            return await applyAgreementTransition({
+            const idempotency = await checkIdempotency(
                 client,
-                agreementId: command.agreementId,
-                eventType: 'AgreementSettled',
-                idempotencyKey: command.idempotencyKey,
+                command.idempotencyKey,
+                'AgreementSettled',
+                command.requestHash,
+                (row) => parseTransitionPayload(row.response_body),
+            );
+
+            if (idempotency.kind === 'conflict') {
+                await client.query('COMMIT', []);
+                return { kind: 'conflict' };
+            }
+
+            if (idempotency.kind === 'replayed') {
+                await client.query('COMMIT', []);
+                return { kind: 'replayed', payload: idempotency.value };
+            }
+
+            const hasReadModel = await lockAgreementReadModel(client, command.agreementId);
+            const streamEvents = await loadStreamEvents(client, command.agreementId);
+            const aggregate = fromEvents(streamEvents);
+
+            if (!hasReadModel && !aggregate.state) {
+                await client.query('COMMIT', []);
+                return { kind: 'not_found' };
+            }
+
+            const transactionId = `txn_${randomUUID()}`;
+            const decision = decideSettlement(aggregate, transactionId);
+
+            if (decision.kind === 'not_found') {
+                await client.query('COMMIT', []);
+                return { kind: 'not_found' };
+            }
+
+            if (decision.kind === 'invalid_transition') {
+                await client.query('COMMIT', []);
+                return { kind: 'invalid_transition', currentStatus: decision.currentStatus };
+            }
+
+            if (decision.kind === 'version_conflict') {
+                await client.query('COMMIT', []);
+                return { kind: 'conflict' };
+            }
+
+            const payload = await persistAppendedEvent(client, {
+                streamId: command.agreementId,
+                operationType: 'AgreementSettled',
                 requestHash: command.requestHash,
                 requestId: command.requestId,
                 actorId: command.actorId,
                 actorType: command.actorType,
-                expectedCurrentStatus: 'FUNDED',
-                extendPayload: settlementPayloadExtension,
-                onBeforePersist: insertSettlementLedgerEntry,
+                idempotencyKey: command.idempotencyKey,
+                event: decision.event,
+                responseStatusCode: 200,
             });
+
+            await client.query('COMMIT', []);
+
+            return {
+                kind: 'transitioned',
+                payload,
+            };
         } catch (error) {
             await client.query('ROLLBACK', []);
             throw error;

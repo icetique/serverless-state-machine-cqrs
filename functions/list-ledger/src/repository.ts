@@ -20,14 +20,13 @@ export class PostgresLedgerReadRepository implements LedgerReadRepository {
         const result = await this.pool.query<LedgerEntryRow>(
             `
                 SELECT
-                    ledger_entries.transaction_id,
-                    agreements.public_id AS agreement_id,
-                    ledger_entries.amount,
-                    ledger_entries.entry_type,
-                    ledger_entries.created_at::text
-                FROM ledger_entries
-                INNER JOIN agreements ON agreements.id = ledger_entries.agreement_id
-                ORDER BY ledger_entries.id DESC
+                    transaction_id,
+                    agreement_id,
+                    amount,
+                    entry_type,
+                    created_at::text
+                FROM ledger_read_model
+                ORDER BY id DESC
                 LIMIT $1
             `,
             [limit],

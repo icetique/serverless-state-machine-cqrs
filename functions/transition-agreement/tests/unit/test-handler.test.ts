@@ -81,8 +81,6 @@ describe('Transition agreement handler', () => {
                 agreementId: 'agr_123',
                 idempotencyKey: 'idem_1',
                 eventType: 'AgreementApproved',
-                expectedCurrentStatus: 'CREATED',
-                nextStatus: 'APPROVED',
             }),
         );
     });

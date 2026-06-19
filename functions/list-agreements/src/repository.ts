@@ -32,9 +32,9 @@ export class PostgresAgreementsReadRepository implements AgreementsReadRepositor
         const result = await this.pool.query<AgreementSummaryRow>(
             `
                 SELECT public_id, status, merchant_id, partner_id, amount, created_at::text
-                FROM agreements
+                FROM agreements_read_model
                 ${filterClause}
-                ORDER BY id DESC
+                ORDER BY updated_at DESC
                 LIMIT $1
             `,
             values,

@@ -122,6 +122,27 @@ These must match the issuer and audience on tokens from your Supabase project (`
 
 If sign-in succeeds but the UI stays on the login screen, claims are missing or invalid — re-check `raw_app_meta_data`, hook enablement, and sign out/in so a fresh token is issued.
 
+## Database reset (Phase 2 event-sourced schema)
+
+The app schema is **event-sourced** (`event_store`, `agreements_read_model`, `ledger_read_model`). After upgrading from Phase 1 migrations or squashing the migration chain, reset the **application tables** on the CQRS Supabase project (Auth users and the JWT hook are unchanged).
+
+In **SQL Editor** (destructive — only on the CQRS demo database):
+
+```sql
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+```
+
+Then from the repo root:
+
+```bash
+npm run migrate:up
+```
+
+This applies [`db/migrations/0001_event_sourced_baseline.js`](../db/migrations/0001_event_sourced_baseline.js). Integration tests (`INTEGRATION_DATABASE_URL`) and local `DATABASE_URL` must point at this reset database before running writes.
+
 ## Local SAM note
 
 `sam local start-api --disable-authorizer` skips API Gateway JWT validation; Lambdas still parse the bearer token when `AWS_SAM_LOCAL` is set. Use the same Supabase access tokens as production — the claim shape is identical.

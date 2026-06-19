@@ -66,7 +66,9 @@ const main = async () => {
     console.log(`  ${target}`);
     console.log('');
     console.log('Each run creates several test agreements (agr_int_*, agr_idem_*, …),');
-    console.log('audit events, outbox rows, and ledger entries. Nothing is deleted afterward.');
+    console.log(
+        'event_store rows, read-model projections, outbox rows, and idempotency keys. Nothing is deleted afterward.',
+    );
     console.log('');
     console.warn('⚠  Confirm this is NOT a production database before continuing.');
     console.log('');

@@ -50,14 +50,14 @@ export function AdminObservabilityPanel({
 
             <section className="panel response-panel admin-panel-section admin-event-stream">
                 <div className="panel-header">
-                    <h2>Event Stream</h2>
+                    <h2>Event Store</h2>
                     <span className="badge muted">{isLoadingEvents ? 'Loading…' : 'Admin Only'}</span>
                 </div>
                 {eventsError ? <pre className="response error">{eventsError}</pre> : null}
                 {isLoadingEvents && events.length === 0 ? (
                     <div className="empty-state">Loading events…</div>
                 ) : events.length === 0 ? (
-                    <div className="empty-state">No persisted events yet.</div>
+                    <div className="empty-state">No event store rows yet.</div>
                 ) : (
                     <div className="event-list">
                         {events.map((event) => (
