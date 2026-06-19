@@ -12,7 +12,8 @@
         "types": ["node"],
         "baseUrl": ".",
         "paths": {
-            "@serverless-state-machine-cqrs/domain": ["../../packages/domain/dist/index.d.ts"]
+            "@serverless-state-machine-cqrs/domain": ["../../packages/domain/dist/index.d.ts"],
+            "@serverless-state-machine-cqrs/db-ports": ["../../packages/db-ports/dist/index.d.ts"]
         }
     },
     "include": ["src/**/*.ts"]

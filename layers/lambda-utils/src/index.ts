@@ -216,21 +216,12 @@ export const createPool = (connectionString: string): Pool => {
     return new Pool(config);
 };
 
-export interface QueryResult<Row> {
-    rows: Row[];
-}
-
-export interface Queryable {
-    query<Row>(text: string, values: unknown[]): Promise<QueryResult<Row>>;
-}
-
-export interface TransactionalQueryable extends Queryable {
-    release(): void;
-}
-
-export interface TransactionPool {
-    connect(): Promise<TransactionalQueryable>;
-}
+export type {
+    QueryResult,
+    Queryable,
+    TransactionalQueryable,
+    TransactionPool,
+} from '@serverless-state-machine-cqrs/db-ports';
 
 export const getIdempotencyKey = (event: APIGatewayProxyEventV2WithJWTAuthorizer): string => {
     const headers = event.headers ?? {};

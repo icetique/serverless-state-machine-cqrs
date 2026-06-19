@@ -36,6 +36,7 @@ serverless-state-machine-cqrs/
 │   └── debug-events/               # GET /debug/events
 ├── packages/
 │   ├── domain/                     # Commands, queries, state machine (pure TypeScript)
+│   ├── db-ports/                   # DB port types (TransactionPool, Queryable)
 │   └── persistence/                # PostgresAgreementCommandRepository (write side)
 ├── layers/lambda-utils/            # Lambda layer: auth helpers + domain/persistence runtime packages
 ├── shared/                         # Compile-time auth contract for the UI only
@@ -109,7 +110,7 @@ Phase 1 makes the CQRS split explicit in code and imports:
 
 ### Approve, fund, and settle as separate Lambdas
 
-`template.yaml` defines three HTTP transition functions (`ApproveAgreementFunction`, `FundAgreementFunction`, `SettleAgreementFunction`) that share one handler package but receive different env vars (`TRANSITION_EVENT_TYPE`, `TRANSITION_ACTION`, `TRANSITION_ACTOR_TYPE`). This is intentional:
+`template.yaml` defines three HTTP transition functions (`ApproveAgreementFunction`, `FundAgreementFunction`, `SettleAgreementFunction`) that share one handler package but receive different env vars (`TRANSITION_EVENT_TYPE`, `EXPECTED_CURRENT_STATUS`, `NEXT_STATUS`). This is intentional:
 
 - **Independent deploy and scaling** — approve/fund/settle can be tuned separately (memory, concurrency, alarms).
 - **Least-privilege IAM** — each route maps to one Lambda; no runtime action dispatch table in a single fat handler.

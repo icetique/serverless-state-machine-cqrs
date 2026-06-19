@@ -1,4 +1,4 @@
-import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/lambda-utils';
+import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
 
 export interface IdempotencyRow {
     request_hash: string;

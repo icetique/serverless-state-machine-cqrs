@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { PostgresAgreementCommandRepository } from '../../src/agreement-command-repository';
-import type { TransactionPool, TransactionalQueryable } from '@serverless-state-machine-cqrs/lambda-utils';
+import type { TransactionPool, TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
 
 describe('PostgresAgreementCommandRepository', () => {
     it('creates agreement, audit row, idempotency row, and outbox row in one transaction', async () => {
@@ -398,5 +398,282 @@ describe('PostgresAgreementCommandRepository', () => {
         });
 
         expect(result).toEqual({ kind: 'invalid_transition', currentStatus: 'APPROVED' });
+    });
+
+    it('rejects transition when agreement status does not match expectedCurrentStatus', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+            if (text.includes('FROM idempotency_keys')) {
+                return { rows: [] };
+            }
+            if (text.includes('SELECT id, public_id, status')) {
+                return {
+                    rows: [
+                        {
+                            id: 1,
+                            public_id: 'agr_123',
+                            status: 'APPROVED',
+                            merchant_id: 'merchant_1',
+                            partner_id: 'partner_2',
+                            amount: '1000',
+                        },
+                    ],
+                };
+            }
+            return { rows: [] };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).transitionAgreement({
+            agreementId: 'agr_123',
+            expectedCurrentStatus: 'CREATED',
+            nextStatus: 'APPROVED',
+            eventType: 'AgreementApproved',
+            idempotencyKey: 'idem_1',
+            requestHash: 'hash_1',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'partner',
+        });
+
+        expect(result).toEqual({ kind: 'invalid_transition', currentStatus: 'APPROVED' });
+    });
+
+    it('replays a stored transition when the idempotency key matches', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+
+            return {
+                rows: [
+                    {
+                        request_hash: 'hash_1',
+                        response_status_code: 200,
+                        response_body:
+                            '{"agreementId":"agr_123","merchantId":"merchant_1","partnerId":"partner_2","amount":1000,"previousStatus":"CREATED","newStatus":"APPROVED"}',
+                    },
+                ],
+            };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).transitionAgreement({
+            agreementId: 'agr_123',
+            expectedCurrentStatus: 'CREATED',
+            nextStatus: 'APPROVED',
+            eventType: 'AgreementApproved',
+            idempotencyKey: 'idem_1',
+            requestHash: 'hash_1',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'partner',
+        });
+
+        expect(result).toEqual({
+            kind: 'replayed',
+            payload: {
+                agreementId: 'agr_123',
+                merchantId: 'merchant_1',
+                partnerId: 'partner_2',
+                amount: 1000,
+                previousStatus: 'CREATED',
+                newStatus: 'APPROVED',
+            },
+        });
+    });
+
+    it('returns conflict when a transition idempotency key is reused with a different hash', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+
+            return {
+                rows: [
+                    {
+                        request_hash: 'hash_1',
+                        response_status_code: 200,
+                        response_body: '{}',
+                    },
+                ],
+            };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).transitionAgreement({
+            agreementId: 'agr_123',
+            expectedCurrentStatus: 'CREATED',
+            nextStatus: 'APPROVED',
+            eventType: 'AgreementApproved',
+            idempotencyKey: 'idem_1',
+            requestHash: 'different_hash',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'partner',
+        });
+
+        expect(result).toEqual({ kind: 'conflict' });
+    });
+
+    it('returns not_found when transitioning a missing agreement', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+            if (text.includes('FROM idempotency_keys')) {
+                return { rows: [] };
+            }
+            if (text.includes('SELECT id, public_id, status')) {
+                return { rows: [] };
+            }
+            return { rows: [] };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).transitionAgreement({
+            agreementId: 'agr_missing',
+            expectedCurrentStatus: 'CREATED',
+            nextStatus: 'APPROVED',
+            eventType: 'AgreementApproved',
+            idempotencyKey: 'idem_1',
+            requestHash: 'hash_1',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'partner',
+        });
+
+        expect(result).toEqual({ kind: 'not_found' });
+    });
+
+    it('rejects AgreementSettled via transitionAgreement', async () => {
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => {
+                throw new Error('connect should not be called');
+            }),
+        };
+
+        await expect(
+            new PostgresAgreementCommandRepository(pool).transitionAgreement({
+                agreementId: 'agr_123',
+                expectedCurrentStatus: 'FUNDED',
+                nextStatus: 'SETTLED',
+                eventType: 'AgreementSettled',
+                idempotencyKey: 'idem_1',
+                requestHash: 'hash_1',
+                requestId: 'req_1',
+                actorId: 'api_gateway',
+                actorType: 'merchant',
+            }),
+        ).rejects.toThrow('Settlement must use settleAgreement');
+    });
+
+    it('replays settlement when the idempotency key matches', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+
+            return {
+                rows: [
+                    {
+                        request_hash: 'hash_1',
+                        response_status_code: 200,
+                        response_body:
+                            '{"agreementId":"agr_123","merchantId":"merchant_1","partnerId":"partner_2","amount":1000,"previousStatus":"FUNDED","newStatus":"SETTLED","transactionId":"txn_replay"}',
+                    },
+                ],
+            };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).settleAgreement({
+            agreementId: 'agr_123',
+            idempotencyKey: 'idem_1',
+            requestHash: 'hash_1',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'merchant',
+            triggerSource: 'http_manual',
+        });
+
+        expect(result).toEqual({
+            kind: 'replayed',
+            payload: {
+                agreementId: 'agr_123',
+                merchantId: 'merchant_1',
+                partnerId: 'partner_2',
+                amount: 1000,
+                previousStatus: 'FUNDED',
+                newStatus: 'SETTLED',
+                transactionId: 'txn_replay',
+            },
+        });
+    });
+
+    it('returns not_found when settling a missing agreement', async () => {
+        const query = jest.fn(async (text: string, _values: unknown[]) => {
+            if (text === 'BEGIN' || text === 'COMMIT') {
+                return { rows: [] };
+            }
+            if (text.includes('FROM idempotency_keys')) {
+                return { rows: [] };
+            }
+            if (text.includes('SELECT id, public_id, status')) {
+                return { rows: [] };
+            }
+            return { rows: [] };
+        });
+        const client: TransactionalQueryable = {
+            query: ((text, values) => query(text, values)) as TransactionalQueryable['query'],
+            release: jest.fn(),
+        };
+        const pool: TransactionPool = {
+            connect: jest.fn(async () => client),
+        };
+
+        const result = await new PostgresAgreementCommandRepository(pool).settleAgreement({
+            agreementId: 'agr_missing',
+            idempotencyKey: 'idem_1',
+            requestHash: 'hash_1',
+            requestId: 'req_1',
+            actorId: 'api_gateway',
+            actorType: 'merchant',
+            triggerSource: 'http_manual',
+        });
+
+        expect(result).toEqual({ kind: 'not_found' });
     });
 });

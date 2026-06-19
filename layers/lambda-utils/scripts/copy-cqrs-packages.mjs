@@ -55,5 +55,6 @@ const publishPackage = (name, packageDir) => {
 };
 
 fs.mkdirSync(scopeDir, { recursive: true });
+publishPackage('db-ports', path.join(repoRoot, 'packages', 'db-ports'));
 publishPackage('domain', path.join(repoRoot, 'packages', 'domain'));
 publishPackage('persistence', path.join(repoRoot, 'packages', 'persistence'));

@@ -1,6 +1,6 @@
 import { AGREEMENT_EVENT_SOURCE } from '@serverless-state-machine-cqrs/domain';
 import type { AgreementEventType } from '@serverless-state-machine-cqrs/domain';
-import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/lambda-utils';
+import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
 import type { AgreementStatus } from '@serverless-state-machine-cqrs/domain';
 
 export const insertAgreementEvent = async (

@@ -12,6 +12,9 @@
             "@serverless-state-machine-cqrs/lambda-utils": [
                 "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils/index.d.ts"
             ],
+            "@serverless-state-machine-cqrs/db-ports": [
+                "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/db-ports/index.d.ts"
+            ],
             "@serverless-state-machine-cqrs/domain": [
                 "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/domain/index.d.ts"
             ],

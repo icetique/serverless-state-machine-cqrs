@@ -7,12 +7,7 @@
         "outDir": "dist",
         "rootDir": "src",
         "esModuleInterop": true,
-        "skipLibCheck": true,
-        "baseUrl": ".",
-        "paths": {
-            "@serverless-state-machine-cqrs/domain": ["../domain/dist/index.d.ts"],
-            "@serverless-state-machine-cqrs/db-ports": ["../db-ports/dist/index.d.ts"]
-        }
+        "skipLibCheck": true
     },
     "include": ["src/**/*"]
 }
