@@ -1,6 +1,5 @@
-import type { AgreementEventType } from '@serverless-state-machine-cqrs/domain';
-import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
-import type { StreamEventRecord } from '@serverless-state-machine-cqrs/domain';
+import type { AgreementEventType, StreamEventRecord } from '@serverless-state-machine-cqrs/domain';
+import type { Queryable, TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
 
 export interface EventStoreRow {
     stream_version: number;
@@ -13,6 +12,27 @@ export interface EventStoreRow {
         idempotency_key: string;
     };
 }
+
+const mapStreamRows = (rows: EventStoreRow[]): StreamEventRecord[] =>
+    rows.map((row) => ({
+        streamVersion: row.stream_version,
+        eventType: row.event_type,
+        payload: row.payload,
+    }));
+
+export const readStreamEvents = async (client: Queryable, streamId: string): Promise<StreamEventRecord[]> => {
+    const result = await client.query<EventStoreRow>(
+        `
+            SELECT stream_version, event_type, payload, metadata
+            FROM event_store
+            WHERE stream_id = $1
+            ORDER BY stream_version ASC
+        `,
+        [streamId],
+    );
+
+    return mapStreamRows(result.rows);
+};
 
 export const loadStreamEvents = async (
     client: TransactionalQueryable,
@@ -29,23 +49,5 @@ export const loadStreamEvents = async (
         [streamId],
     );
 
-    return result.rows.map((row) => ({
-        streamVersion: row.stream_version,
-        eventType: row.event_type,
-        payload: row.payload,
-    }));
-};
-
-export const lockAgreementReadModel = async (client: TransactionalQueryable, streamId: string): Promise<boolean> => {
-    const result = await client.query(
-        `
-            SELECT public_id
-            FROM agreements_read_model
-            WHERE public_id = $1
-            FOR UPDATE
-        `,
-        [streamId],
-    );
-
-    return result.rows.length > 0;
+    return mapStreamRows(result.rows);
 };

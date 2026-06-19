@@ -24,8 +24,6 @@ const parseBody = (body: string | undefined) => JSON.parse(body ?? '{}');
 
 const config = {
     eventType: 'AgreementApproved' as const,
-    expectedCurrentStatus: 'CREATED' as const,
-    nextStatus: 'APPROVED' as const,
 };
 
 describe('Transition agreement handler', () => {
@@ -155,11 +153,7 @@ describe('Transition agreement handler', () => {
 
         const result = await createHandler(
             repository,
-            {
-                eventType: 'AgreementSettled',
-                expectedCurrentStatus: 'FUNDED',
-                nextStatus: 'SETTLED',
-            },
+            { eventType: 'AgreementSettled' },
             settlementProcessor,
         )(createEvent('agr_123', 'idem_settle', TEST_JWT_CLAIMS.merchant));
 
@@ -189,11 +183,7 @@ describe('Transition agreement handler', () => {
         try {
             const result = await createHandler(
                 repository,
-                {
-                    eventType: 'AgreementSettled',
-                    expectedCurrentStatus: 'FUNDED',
-                    nextStatus: 'SETTLED',
-                },
+                { eventType: 'AgreementSettled' },
                 settlementProcessor,
             )(createEvent('agr_123', 'idem_settle', TEST_JWT_CLAIMS.merchant));
 
@@ -246,11 +236,7 @@ describe('Transition agreement handler', () => {
 
         const result = await createHandler(
             repository,
-            {
-                eventType: 'AgreementFunded',
-                expectedCurrentStatus: 'APPROVED',
-                nextStatus: 'FUNDED',
-            },
+            { eventType: 'AgreementFunded' },
             settlementProcessor,
         )(createEvent('agr_123', 'idem_1'));
 

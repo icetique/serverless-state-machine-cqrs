@@ -54,16 +54,23 @@ export const getTransitionSpec = (eventType: AgreementEventType): TransitionSpec
     return AGREEMENT_TRANSITIONS[eventType];
 };
 
-export const assertTransitionConfig = (
-    eventType: AgreementEventType,
-    expectedCurrentStatus: AgreementStatus,
-    nextStatus: AgreementStatus,
-): TransitionSpec => {
+export const assertTransitionEventType = (eventType: AgreementEventType): TransitionSpec => {
     const spec = getTransitionSpec(eventType);
 
     if (!spec) {
         throw new InvalidTransitionError(`Event type ${eventType} is not a transition`);
     }
+
+    return spec;
+};
+
+/** @deprecated Use assertTransitionEventType — kept for tests that verify invalid SAM wiring. */
+export const assertTransitionConfig = (
+    eventType: AgreementEventType,
+    expectedCurrentStatus: AgreementStatus,
+    nextStatus: AgreementStatus,
+): TransitionSpec => {
+    const spec = assertTransitionEventType(eventType);
 
     if (spec.from !== expectedCurrentStatus || spec.to !== nextStatus) {
         throw new InvalidTransitionError(

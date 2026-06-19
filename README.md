@@ -100,9 +100,13 @@ Commands append to `event_store` and update read models in one transaction. Quer
 | Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                                       |
 | ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — replay stream, `decide`, append events, project `agreements_read_model` / `ledger_read_model`, `outbox_events` |
-| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` from read models or `event_store` — no command repository imports                                                                            |
+| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` from read models (`list-*`) or `event_store` (`debug-events`) — no command repository imports                                                |
 
-**Domain package** (`packages/domain/`) holds aggregate replay (`Agreement.fromEvents`, `decide`), command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
+**Command-side replay:** before transitions and for RBAC checks, `findAgreementByPublicId` replays `event_store` (not the read model). List and ledger queries stay on projections.
+
+**Concurrency:** writers on the same agreement stream take a Postgres advisory transaction lock, then `SELECT … FOR UPDATE` on existing events. Empty streams need the advisory lock because `FOR UPDATE` locks no rows.
+
+**Domain package** (`packages/domain/`) holds aggregate replay (`fromEvents`, `decide`), command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
 
 **Persistence package** (`packages/persistence/`) implements the event-sourced `PostgresAgreementCommandRepository`. It is built into the Lambda layer alongside `lambda-utils` (`npm run build:layer`).
 
@@ -110,13 +114,13 @@ Commands append to `event_store` and update read models in one transaction. Quer
 
 ### vs upstream (CRUD demo)
 
-| Concern             | Upstream `serverless-state-machine` | This repo                                       |
-| ------------------- | ----------------------------------- | ----------------------------------------------- |
-| Source of truth     | Mutable `agreements.status`         | Append-only `event_store` per agreement stream  |
-| History             | `agreement_events` audit dual-write | Canonical events in `event_store`               |
-| List / ledger reads | `agreements`, `ledger_entries`      | `agreements_read_model`, `ledger_read_model`    |
-| Write path          | `UPDATE agreements` + audit insert  | Replay + `decide` + append + sync projections   |
-| Concurrency         | Row lock + expected status          | Stream replay (HTTP `expectedVersion` deferred) |
+| Concern             | Upstream `serverless-state-machine` | This repo                                      |
+| ------------------- | ----------------------------------- | ---------------------------------------------- |
+| Source of truth     | Mutable `agreements.status`         | Append-only `event_store` per agreement stream |
+| History             | `agreement_events` audit dual-write | Canonical events in `event_store`              |
+| List / ledger reads | `agreements`, `ledger_entries`      | `agreements_read_model`, `ledger_read_model`   |
+| Write path          | `UPDATE agreements` + audit insert  | Replay + `decide` + append + sync projections  |
+| Concurrency         | Row lock + expected status          | Stream advisory lock + `FOR UPDATE` on events  |
 
 ### Approve, fund, and settle as separate Lambdas
 
@@ -126,7 +130,7 @@ Commands append to `event_store` and update read models in one transaction. Quer
 - **Least-privilege IAM** — each route maps to one Lambda; no runtime action dispatch table in a single fat handler.
 - **SAM/IaC clarity** — one API route per function matches the OpenAPI surface.
 
-Domain rules stay centralized in `packages/domain` (`validateTransition`, `assertTransitionConfig`). The repository loads the agreement stream and calls `Agreement.decide`; env vars select which event type to append, not which row status to expect.
+Domain rules stay centralized in `packages/domain` (`validateTransition`, `getTransitionSpec`). Each transition Lambda sets `TRANSITION_EVENT_TYPE` only; the repository replays the stream and calls `decide`.
 
 ## Async settlement (SQS)
 
@@ -169,7 +173,9 @@ Prerequisites:
 - Node.js
 - SAM CLI
 
-Run migrations (loads `DATABASE_URL` from `.env` automatically). **First time on Phase 2 schema:** reset the CQRS Supabase app schema (see [docs/supabase-setup.md](docs/supabase-setup.md#database-reset-phase-2-event-sourced-schema)), then:
+Use a **dedicated** Supabase project for this repo — not the upstream `payments-example` database (see [docs/supabase-setup.md](docs/supabase-setup.md)).
+
+Run migrations (loads `DATABASE_URL` from `.env` automatically). On a **new** project, run this once after supabase-setup steps 1–5:
 
 ```bash
 cp .env.example .env   # first time only
@@ -222,16 +228,13 @@ See **[docs/supabase-setup.md](docs/supabase-setup.md)** for creating demo users
     - `merchant_id`
     - `partner_id`
 
-The local UI uses the same Supabase-backed login flow as the deployed app. Configure:
+The local UI uses the same Supabase-backed login flow as the deployed app. Configure in `apps/ui/.env`:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_API_BASE_URL` — **production only** (API Gateway URL on Vercel); omit locally
-- `DATABASE_URL` in `.env` / `.env.json`
 
-## Local database
-
-Local development uses a Supabase Postgres `DATABASE_URL`.
+Lambdas and migrations use `DATABASE_URL` in root `.env` and `.env.json` (copy from `.env.example` / `.env.json.example`).
 
 ## Settlement execution modes
 
@@ -279,9 +282,9 @@ Runs Prettier, `sam validate --lint`, TypeScript, ESLint (`lint:check`), `check:
 
 ### Postgres integration tests
 
-**Not safe on production.** Tests call the real command repository and **append** to `event_store`, read models, outbox rows, and idempotency keys. Rows are **not** deleted afterward (IDs like `agr_int_*`, `agr_idem_*`).
+**Not safe on production.** Tests call the real command repository and **append** to `event_store`, read models, outbox rows, and idempotency keys. Rows are **not** deleted afterward (IDs like `agr_int_*`, `agr_idem_*`, `agr_race_*`). Coverage includes happy path, idempotency replay/conflict, and concurrent create/approve on the same agreement.
 
-Requires a database migrated with `npm run migrate:up` on the Phase 2 baseline (`0001_event_sourced_baseline.js`). Reset an old Phase 1 schema before running (see [docs/supabase-setup.md](docs/supabase-setup.md#database-reset-phase-2-event-sourced-schema)).
+Requires a database migrated with `npm run migrate:up` (see [docs/supabase-setup.md](docs/supabase-setup.md)).
 
 1. Set `INTEGRATION_DATABASE_URL` in `.env` to a **dedicated non-production** database (local Postgres or a throwaway Supabase project).
 2. Do **not** point this at `DATABASE_URL` for a production or shared demo DB unless you accept test junk in that database.

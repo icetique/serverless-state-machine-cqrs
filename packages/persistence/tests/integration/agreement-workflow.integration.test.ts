@@ -115,6 +115,29 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
             merchantId,
             partnerId,
         });
+
+        const events = await pool.query<{ event_type: string; stream_version: number }>(
+            `SELECT event_type, stream_version FROM event_store WHERE stream_id = $1 ORDER BY stream_version`,
+            [publicId],
+        );
+        expect(events.rows.map((row) => row.event_type)).toEqual([
+            'AgreementCreated',
+            'AgreementApproved',
+            'AgreementFunded',
+            'AgreementSettled',
+        ]);
+
+        const readModel = await pool.query<{ status: string; stream_version: number }>(
+            `SELECT status, stream_version FROM agreements_read_model WHERE public_id = $1`,
+            [publicId],
+        );
+        expect(readModel.rows[0]).toEqual({ status: 'SETTLED', stream_version: 4 });
+
+        const ledger = await pool.query<{ agreement_id: string }>(
+            `SELECT agreement_id FROM ledger_read_model WHERE agreement_id = $1`,
+            [publicId],
+        );
+        expect(ledger.rows).toHaveLength(1);
     });
 
     it('replays and conflicts on create idempotency keys', async () => {
@@ -194,5 +217,72 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
             requestHash: hashRequest({ agreementId: publicId, eventType: 'AgreementFunded' }),
         });
         expect(conflict).toEqual({ kind: 'conflict' });
+    });
+
+    it('serializes concurrent create commands on the same public id', async () => {
+        const publicId = `agr_race_create_${randomUUID()}`;
+        const merchantId = 'merchant_1';
+        const partnerId = 'partner_2';
+        const amount = 1000;
+
+        const makeCreate = (suffix: string) =>
+            repository.createAgreement({
+                publicId,
+                merchantId,
+                partnerId,
+                amount,
+                idempotencyKey: `idem_race_${suffix}_${randomUUID()}`,
+                requestHash: hashRequest({ publicId, suffix }),
+                requestId: `req_${randomUUID()}`,
+                actorId: 'integration_test',
+                actorType: 'merchant',
+            });
+
+        const [first, second] = await Promise.all([makeCreate('a'), makeCreate('b')]);
+        const kinds = [first.kind, second.kind].sort();
+
+        expect(kinds).toEqual(['conflict', 'created']);
+
+        const events = await pool.query(`SELECT COUNT(*)::int AS count FROM event_store WHERE stream_id = $1`, [
+            publicId,
+        ]);
+        expect(events.rows[0]?.count).toBe(1);
+    });
+
+    it('serializes concurrent approve commands on the same agreement', async () => {
+        const publicId = `agr_race_approve_${randomUUID()}`;
+        const created = await repository.createAgreement({
+            publicId,
+            merchantId: 'merchant_1',
+            partnerId: 'partner_2',
+            amount: 800,
+            idempotencyKey: `idem_setup_${randomUUID()}`,
+            requestHash: hashRequest({ publicId }),
+            requestId: `req_${randomUUID()}`,
+            actorId: 'integration_test',
+            actorType: 'merchant',
+        });
+        expect(created.kind).toBe('created');
+
+        const makeApprove = (suffix: string) =>
+            repository.transitionAgreement({
+                agreementId: publicId,
+                eventType: 'AgreementApproved',
+                idempotencyKey: `idem_race_${suffix}_${randomUUID()}`,
+                requestHash: hashRequest({ agreementId: publicId, suffix }),
+                requestId: `req_${randomUUID()}`,
+                actorId: 'integration_test',
+                actorType: 'partner',
+            });
+
+        const [first, second] = await Promise.all([makeApprove('a'), makeApprove('b')]);
+        const kinds = [first.kind, second.kind].sort();
+
+        expect(kinds).toEqual(['invalid_transition', 'transitioned']);
+
+        const events = await pool.query(`SELECT COUNT(*)::int AS count FROM event_store WHERE stream_id = $1`, [
+            publicId,
+        ]);
+        expect(events.rows[0]?.count).toBe(2);
     });
 });

@@ -25,7 +25,6 @@ export interface TransitionAgreementCommand {
     requestId: string;
     actorId: string;
     actorType: ActorType;
-    expectedVersion?: number;
 }
 
 export interface SettleAgreementCommand {

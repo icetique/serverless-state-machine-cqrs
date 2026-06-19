@@ -7,8 +7,10 @@ import type {
 import { decideCreate, decideSettlement, decideTransition, fromEvents } from '@serverless-state-machine-cqrs/domain';
 import type { TransactionPool } from '@serverless-state-machine-cqrs/db-ports';
 import { insertEventStoreRow } from './event-store/append-event';
-import { loadStreamEvents, lockAgreementReadModel } from './event-store/load-stream';
+import { loadStreamEvents, readStreamEvents } from './event-store/load-stream';
+import { lockAgreementStream } from './event-store/stream-lock';
 import { projectAgreementEvent, projectLedgerEvent } from './projections/read-models';
+import { isUniqueViolation } from './db/pg-errors';
 import {
     type AgreementLookup,
     type AgreementRecord,
@@ -32,14 +34,6 @@ export interface AgreementCommandRepository {
     findAgreementByPublicId(agreementId: string): Promise<AgreementLookup | null>;
     transitionAgreement(command: TransitionAgreementCommand): Promise<TransitionAgreementResult>;
     settleAgreement(command: SettleAgreementCommand): Promise<TransitionAgreementResult>;
-}
-
-interface ReadModelRow {
-    public_id: string;
-    status: AgreementLookup['status'];
-    merchant_id: string;
-    partner_id: string;
-    amount: string;
 }
 
 const parseAgreementRecord = (body: string): AgreementRecord => JSON.parse(body) as AgreementRecord;
@@ -112,6 +106,8 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
         try {
             await client.query('BEGIN', []);
 
+            await lockAgreementStream(client, command.publicId);
+
             const idempotency = await checkIdempotency(
                 client,
                 command.idempotencyKey,
@@ -167,6 +163,9 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
             };
         } catch (error) {
             await client.query('ROLLBACK', []);
+            if (isUniqueViolation(error)) {
+                return { kind: 'conflict' };
+            }
             throw error;
         } finally {
             client.release();
@@ -177,25 +176,19 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
         const client = await this.pool.connect();
 
         try {
-            const agreement = await client.query<ReadModelRow>(
-                `
-                    SELECT public_id, status, merchant_id, partner_id, amount
-                    FROM agreements_read_model
-                    WHERE public_id = $1
-                `,
-                [agreementId],
-            );
+            const streamEvents = await readStreamEvents(client, agreementId);
+            const aggregate = fromEvents(streamEvents);
 
-            const row = agreement.rows[0];
+            if (!aggregate.state) {
+                return null;
+            }
 
-            return row
-                ? {
-                      agreementId: row.public_id,
-                      status: row.status,
-                      merchantId: row.merchant_id,
-                      partnerId: row.partner_id,
-                  }
-                : null;
+            return {
+                agreementId: aggregate.state.agreementId,
+                status: aggregate.state.status,
+                merchantId: aggregate.state.merchantId,
+                partnerId: aggregate.state.partnerId,
+            };
         } finally {
             client.release();
         }
@@ -206,6 +199,8 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
 
         try {
             await client.query('BEGIN', []);
+
+            await lockAgreementStream(client, command.agreementId);
 
             const idempotency = await checkIdempotency(
                 client,
@@ -225,16 +220,15 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
                 return { kind: 'replayed', payload: idempotency.value };
             }
 
-            const hasReadModel = await lockAgreementReadModel(client, command.agreementId);
             const streamEvents = await loadStreamEvents(client, command.agreementId);
             const aggregate = fromEvents(streamEvents);
 
-            if (!hasReadModel && !aggregate.state) {
+            if (!aggregate.state) {
                 await client.query('COMMIT', []);
                 return { kind: 'not_found' };
             }
 
-            const decision = decideTransition(aggregate, command.eventType, command.expectedVersion);
+            const decision = decideTransition(aggregate, command.eventType);
 
             if (decision.kind === 'not_found') {
                 await client.query('COMMIT', []);
@@ -244,11 +238,6 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
             if (decision.kind === 'invalid_transition') {
                 await client.query('COMMIT', []);
                 return { kind: 'invalid_transition', currentStatus: decision.currentStatus };
-            }
-
-            if (decision.kind === 'version_conflict') {
-                await client.query('COMMIT', []);
-                return { kind: 'conflict' };
             }
 
             const payload = await persistAppendedEvent(client, {
@@ -271,6 +260,9 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
             };
         } catch (error) {
             await client.query('ROLLBACK', []);
+            if (isUniqueViolation(error)) {
+                return { kind: 'conflict' };
+            }
             throw error;
         } finally {
             client.release();
@@ -282,6 +274,8 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
 
         try {
             await client.query('BEGIN', []);
+
+            await lockAgreementStream(client, command.agreementId);
 
             const idempotency = await checkIdempotency(
                 client,
@@ -301,11 +295,10 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
                 return { kind: 'replayed', payload: idempotency.value };
             }
 
-            const hasReadModel = await lockAgreementReadModel(client, command.agreementId);
             const streamEvents = await loadStreamEvents(client, command.agreementId);
             const aggregate = fromEvents(streamEvents);
 
-            if (!hasReadModel && !aggregate.state) {
+            if (!aggregate.state) {
                 await client.query('COMMIT', []);
                 return { kind: 'not_found' };
             }
@@ -321,11 +314,6 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
             if (decision.kind === 'invalid_transition') {
                 await client.query('COMMIT', []);
                 return { kind: 'invalid_transition', currentStatus: decision.currentStatus };
-            }
-
-            if (decision.kind === 'version_conflict') {
-                await client.query('COMMIT', []);
-                return { kind: 'conflict' };
             }
 
             const payload = await persistAppendedEvent(client, {
@@ -348,6 +336,9 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
             };
         } catch (error) {
             await client.query('ROLLBACK', []);
+            if (isUniqueViolation(error)) {
+                return { kind: 'conflict' };
+            }
             throw error;
         } finally {
             client.release();

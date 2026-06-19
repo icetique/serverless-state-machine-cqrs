@@ -11,7 +11,7 @@ This project uses **Supabase Auth** for sign-in and **custom JWT claims** for RB
 
 Types: `shared/auth-contract.ts` (`SupabaseJwtClaims`). Parsed in `ui/src/auth/sessionIdentity.ts` and `layers/lambda-utils/src/index.ts`.
 
-## How it works today
+## How it works
 
 ```text
 auth.users.raw_app_meta_data          Supabase JWT (before hook)
@@ -32,15 +32,18 @@ auth.users.raw_app_meta_data          Supabase JWT (before hook)
               lambda-utils → AuthContext
 ```
 
-There is **no** `user_roles` table or other auth schema in `db/migrations/`. Only:
+There is **no** `user_roles` table in `db/migrations/`. You need:
 
 1. Rows in `auth.users` with `raw_app_meta_data` set
 2. Postgres function `public.custom_access_token_hook`
 3. Hook enabled in Supabase Dashboard (Authentication → Hooks → Custom access token)
+4. App schema from `npm run migrate:up` (see step 5)
 
-The hook implementation in this project reads **`claims.app_metadata`** (already populated by Supabase from `raw_app_meta_data`) and copies fields onto **top-level** claims. That matches what the code expects — not nested `app_metadata.app_role`.
+The hook reads **`claims.app_metadata`** (populated by Supabase from `raw_app_meta_data`) and copies fields onto **top-level** claims.
 
-## One-time setup
+## Setup (new CQRS Supabase project)
+
+Use a **dedicated** Supabase project for this repo — not the upstream `payments-example` database.
 
 ### 1. Create users (Dashboard)
 
@@ -49,7 +52,7 @@ In **Authentication → Users → Add user**, create three users (email + passwo
 - Root `.env` (`MERCHANT_EMAIL`, `PARTNER_EMAIL`, `ADMIN_EMAIL`) for `scripts/smoke-async-retry.mjs`
 - `ui/.env` demo prefill (`VITE_DEMO_*`) if you want login shortcuts
 
-`.env.example` uses `@example.com` placeholders; your project may use another domain (e.g. `@icetique.dev`) — the emails must match between Supabase, `.env`, and the SQL below.
+`.env.example` uses `@example.com` placeholders; your project may use another domain (e.g. `@icetique.dev`) — emails must match between Supabase, `.env`, and the SQL below.
 
 ### 2. Install the hook and metadata (SQL)
 
@@ -67,8 +70,6 @@ Open **SQL Editor** and run [`supabase-setup.sql`](./supabase-setup.sql), or pas
 
 - Enable the hook
 - Postgres function: `public.custom_access_token_hook`
-
-(Hosted Supabase: select the function from the dropdown. Self-hosted: `pg-functions://postgres/public/custom_access_token_hook`.)
 
 ### 4. Configure env files
 
@@ -101,7 +102,18 @@ VITE_DEMO_MERCHANT_PASSWORD=...
 - `SupabaseIssuer` = `https://<project-ref>.supabase.co/auth/v1`
 - `SupabaseAudience` = `authenticated`
 
-These must match the issuer and audience on tokens from your Supabase project (`template.yaml` → `SupabaseJwtAuthorizer`).
+### 5. Apply the app schema
+
+On a **new** project, `public` has no app tables yet. From the repo root:
+
+```bash
+cp .env.example .env   # first time only — set DATABASE_URL to this Supabase project
+npm run migrate:up
+```
+
+This creates `event_store`, `agreements_read_model`, `ledger_read_model`, `idempotency_keys`, and `outbox_events` via [`db/migrations/1780600000000_event_sourced_baseline.js`](../db/migrations/1780600000000_event_sourced_baseline.js).
+
+Set `INTEGRATION_DATABASE_URL` to the same URL only on a throwaway database if you run `npm run test:integration`.
 
 ## Verify
 
@@ -121,27 +133,6 @@ These must match the issuer and audience on tokens from your Supabase project (`
 4. Call `GET /agreements` with `Authorization: Bearer <access_token>` — merchant should see only their agreements; admin sees all.
 
 If sign-in succeeds but the UI stays on the login screen, claims are missing or invalid — re-check `raw_app_meta_data`, hook enablement, and sign out/in so a fresh token is issued.
-
-## Database reset (Phase 2 event-sourced schema)
-
-The app schema is **event-sourced** (`event_store`, `agreements_read_model`, `ledger_read_model`). After upgrading from Phase 1 migrations or squashing the migration chain, reset the **application tables** on the CQRS Supabase project (Auth users and the JWT hook are unchanged).
-
-In **SQL Editor** (destructive — only on the CQRS demo database):
-
-```sql
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
-```
-
-Then from the repo root:
-
-```bash
-npm run migrate:up
-```
-
-This applies [`db/migrations/0001_event_sourced_baseline.js`](../db/migrations/0001_event_sourced_baseline.js). Integration tests (`INTEGRATION_DATABASE_URL`) and local `DATABASE_URL` must point at this reset database before running writes.
 
 ## Local SAM note
 

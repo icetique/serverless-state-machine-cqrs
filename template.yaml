@@ -323,8 +323,6 @@ Resources:
                     DATABASE_URL: !Ref DatabaseUrl
                     ENABLE_MANUAL_SETTLEMENT_TRIGGER: 'false'
                     TRANSITION_EVENT_TYPE: AgreementApproved
-                    EXPECTED_CURRENT_STATUS: CREATED
-                    NEXT_STATUS: APPROVED
             Events:
                 ApproveAgreement:
                     Type: HttpApi
@@ -362,8 +360,6 @@ Resources:
                     DATABASE_URL: !Ref DatabaseUrl
                     ENABLE_MANUAL_SETTLEMENT_TRIGGER: 'false'
                     TRANSITION_EVENT_TYPE: AgreementFunded
-                    EXPECTED_CURRENT_STATUS: APPROVED
-                    NEXT_STATUS: FUNDED
             Events:
                 FundAgreement:
                     Type: HttpApi
@@ -402,8 +398,6 @@ Resources:
                     ENABLE_DEV_FAILURE_SIMULATION: 'false'
                     ENABLE_MANUAL_SETTLEMENT_TRIGGER: 'false'
                     TRANSITION_EVENT_TYPE: AgreementSettled
-                    EXPECTED_CURRENT_STATUS: FUNDED
-                    NEXT_STATUS: SETTLED
             Events:
                 SettleAgreement:
                     Type: HttpApi

@@ -1,6 +1,5 @@
 /**
- * Phase 2 event-sourced baseline. Replaces the Phase 1 migration chain.
- * Requires a fresh app schema — see docs/supabase-setup.md § Database reset.
+ * Phase 2 event-sourced baseline. Apply on a new Supabase project — see docs/supabase-setup.md.
  *
  * @type {import('node-pg-migrate').ColumnDefinitions | undefined}
  */

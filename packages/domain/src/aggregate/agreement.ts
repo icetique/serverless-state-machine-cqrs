@@ -13,16 +13,6 @@ export interface AgreementAggregate {
     version: number;
 }
 
-export class VersionConflictError extends Error {
-    constructor(
-        readonly expectedVersion: number,
-        readonly actualVersion: number,
-    ) {
-        super(`Version conflict: expected ${expectedVersion}, actual ${actualVersion}`);
-        this.name = 'VersionConflictError';
-    }
-}
-
 export const emptyAggregate = (): AgreementAggregate => ({
     state: null,
     version: 0,
@@ -122,24 +112,14 @@ export const decideCreate = (
 export type DecideTransitionResult =
     | { kind: 'ok'; event: StreamEventRecord }
     | { kind: 'not_found' }
-    | { kind: 'invalid_transition'; currentStatus: AgreementStatus }
-    | { kind: 'version_conflict'; expectedVersion: number; actualVersion: number };
+    | { kind: 'invalid_transition'; currentStatus: AgreementStatus };
 
 export const decideTransition = (
     aggregate: AgreementAggregate,
     eventType: Exclude<AgreementEventType, 'AgreementCreated'>,
-    expectedVersion?: number,
 ): DecideTransitionResult => {
     if (!aggregate.state) {
         return { kind: 'not_found' };
-    }
-
-    if (expectedVersion !== undefined && aggregate.version !== expectedVersion) {
-        return {
-            kind: 'version_conflict',
-            expectedVersion,
-            actualVersion: aggregate.version,
-        };
     }
 
     const transition = validateTransition(eventType, aggregate.state.status);

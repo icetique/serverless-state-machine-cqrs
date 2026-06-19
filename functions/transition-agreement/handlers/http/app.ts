@@ -1,11 +1,10 @@
-import { createHash } from 'crypto';
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import { createHash } from 'crypto';
 import {
-    assertTransitionConfig,
     authorizeTransition,
     DomainAuthorizationError,
+    getTransitionSpec,
     type AgreementEventType,
-    type AgreementStatus,
 } from '@serverless-state-machine-cqrs/domain';
 import { AgreementCommandRepository, PostgresAgreementCommandRepository } from '../../src/repository';
 import {
@@ -24,27 +23,19 @@ import { withHttpFailureSimulation } from '../../src/dev-failure-simulation';
 class ManualSettlementTriggerDisabledError extends Error {}
 
 interface TransitionConfig {
-    eventType: AgreementEventType;
-    expectedCurrentStatus: AgreementStatus;
-    nextStatus: AgreementStatus;
+    eventType: Exclude<AgreementEventType, 'AgreementCreated'>;
 }
 
 const getTransitionConfig = (): TransitionConfig => {
     const eventType = process.env.TRANSITION_EVENT_TYPE as AgreementEventType | undefined;
-    const expectedCurrentStatus = process.env.EXPECTED_CURRENT_STATUS as AgreementStatus | undefined;
-    const nextStatus = process.env.NEXT_STATUS as AgreementStatus | undefined;
 
-    if (!eventType || !expectedCurrentStatus || !nextStatus) {
+    if (!eventType || eventType === 'AgreementCreated') {
         throw new Error('Transition environment is not configured');
     }
 
-    assertTransitionConfig(eventType, expectedCurrentStatus, nextStatus);
+    getTransitionSpec(eventType);
 
-    return {
-        eventType,
-        expectedCurrentStatus,
-        nextStatus,
-    };
+    return { eventType };
 };
 
 const getAgreementId = (event: APIGatewayProxyEventV2WithJWTAuthorizer): string => {
@@ -67,6 +58,12 @@ export const createHandler = (
     transitionConfig: TransitionConfig,
     settlementProcessor: SettlementProcessor = new DefaultSettlementProcessor(repository),
 ) => {
+    const transitionSpec = getTransitionSpec(transitionConfig.eventType);
+
+    if (!transitionSpec) {
+        throw new Error(`Unsupported transition event type: ${transitionConfig.eventType}`);
+    }
+
     return async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
         try {
             const agreementId = getAgreementId(event);
@@ -111,7 +108,7 @@ export const createHandler = (
                           });
                       })();
 
-            return mapTransitionAgreementResult(result, transitionConfig.nextStatus);
+            return mapTransitionAgreementResult(result, transitionSpec.to);
         } catch (error) {
             const errorResponse = asHttpErrorResponse(error);
 

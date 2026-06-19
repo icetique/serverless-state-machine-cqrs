@@ -110,17 +110,6 @@ test('decideTransition accepts valid transition', () => {
     }
 });
 
-test('decideTransition detects version conflict', () => {
-    const aggregate = fromEvents([createdEvent()]);
-    const result = decideTransition(aggregate, 'AgreementApproved', 5);
-
-    assert.deepEqual(result, {
-        kind: 'version_conflict',
-        expectedVersion: 5,
-        actualVersion: 1,
-    });
-});
-
 test('decideSettlement attaches transactionId', () => {
     const aggregate = fromEvents([
         createdEvent(),
