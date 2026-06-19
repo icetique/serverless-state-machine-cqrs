@@ -212,7 +212,7 @@ async function main() {
     const eventId = `smoke-${randomUUID()}`;
     const bodyPayload = JSON.stringify({
         id: eventId,
-        source: 'payments-example.agreements',
+        source: 'serverless-state-machine-cqrs.agreements',
         'detail-type': 'AgreementFunded',
         detail: {
             agreementId,

@@ -3,8 +3,12 @@ export default {
         '^.+\\.ts?$': 'ts-jest',
     },
     moduleNameMapper: {
-        '^@payments-example/lambda-utils$':
-            '<rootDir>/../../layers/lambda-utils/nodejs/node_modules/@payments-example/lambda-utils/index.js',
+        '^@serverless-state-machine-cqrs/lambda-utils$':
+            '<rootDir>/../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils/index.js',
+        '^@serverless-state-machine-cqrs/domain$':
+            '<rootDir>/../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/domain/index.js',
+        '^@serverless-state-machine-cqrs/persistence$':
+            '<rootDir>/../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/persistence/index.js',
     },
     clearMocks: true,
     collectCoverage: true,

@@ -1,15 +1,8 @@
 import { type Queryable } from './lambda-utils';
+import type { LedgerEntryView } from '@serverless-state-machine-cqrs/domain';
 
-export interface LedgerEntry {
-    transactionId: string;
-    agreementId: string;
-    amount: number;
-    entryType: string;
-    createdAt: string;
-}
-
-export interface LedgerRepository {
-    listEntries(limit: number): Promise<LedgerEntry[]>;
+export interface LedgerReadRepository {
+    listEntries(limit: number): Promise<LedgerEntryView[]>;
 }
 
 interface LedgerEntryRow {
@@ -20,10 +13,10 @@ interface LedgerEntryRow {
     created_at: string;
 }
 
-export class PostgresLedgerRepository implements LedgerRepository {
+export class PostgresLedgerReadRepository implements LedgerReadRepository {
     constructor(private readonly pool: Queryable) {}
 
-    async listEntries(limit: number): Promise<LedgerEntry[]> {
+    async listEntries(limit: number): Promise<LedgerEntryView[]> {
         const result = await this.pool.query<LedgerEntryRow>(
             `
                 SELECT

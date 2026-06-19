@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createHandler } from '../../app';
-import { DebugEventsRepository } from '../../src/repository';
+import { EventStreamReadRepository } from '../../src/repository';
 import { TEST_JWT_CLAIMS, asJwtHandlerEvent, createHttpApiEvent } from '../../../../tests/fixtures/http-api/http-api';
 
 const createEvent = (queryStringParameters?: Record<string, string>, claims = TEST_JWT_CLAIMS.admin) =>
@@ -12,7 +12,7 @@ const createEvent = (queryStringParameters?: Record<string, string>, claims = TE
 const parseBody = (body: string | undefined) => JSON.parse(body ?? '{}');
 
 describe('Debug events handler', () => {
-    const repository: jest.Mocked<DebugEventsRepository> = {
+    const repository: jest.Mocked<EventStreamReadRepository> = {
         listEvents: jest.fn(),
     };
 
@@ -33,6 +33,8 @@ describe('Debug events handler', () => {
                 eventType: 'AgreementCreated',
                 previousStatus: null,
                 newStatus: 'CREATED',
+                actorId: 'merchant_1',
+                actorType: 'merchant',
                 requestId: 'req_1',
                 idempotencyKey: 'idem_1',
                 payload: { agreementId: 'agr_123' },
@@ -53,6 +55,8 @@ describe('Debug events handler', () => {
                     eventType: 'AgreementCreated',
                     previousStatus: null,
                     newStatus: 'CREATED',
+                    actorId: 'merchant_1',
+                    actorType: 'merchant',
                     requestId: 'req_1',
                     idempotencyKey: 'idem_1',
                     payload: { agreementId: 'agr_123' },

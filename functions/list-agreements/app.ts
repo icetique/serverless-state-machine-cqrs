@@ -1,5 +1,5 @@
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
-import { AgreementsRepository, PostgresAgreementsRepository } from './src/repository';
+import { AgreementsReadRepository, PostgresAgreementsReadRepository } from './src/repository';
 import {
     asHttpErrorResponse,
     createPool,
@@ -9,7 +9,7 @@ import {
     requireAuthContext,
 } from './src/lambda-utils';
 
-export const createHandler = (repository: AgreementsRepository) => {
+export const createHandler = (repository: AgreementsReadRepository) => {
     return async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
         try {
             const authContext = requireAuthContext(event);
@@ -40,7 +40,7 @@ let defaultHandler:
 const getDefaultHandler = () => {
     if (!defaultHandler) {
         const pool = createPool(getDatabaseUrl());
-        const repository = new PostgresAgreementsRepository(pool);
+        const repository = new PostgresAgreementsReadRepository(pool);
         defaultHandler = createHandler(repository);
     }
 

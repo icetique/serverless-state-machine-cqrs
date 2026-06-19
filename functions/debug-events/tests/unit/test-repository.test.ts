@@ -1,8 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { PostgresDebugEventsRepository } from '../../src/repository';
+import { PostgresEventStreamReadRepository } from '../../src/repository';
 import { type Queryable } from '../../src/lambda-utils';
 
-describe('PostgresDebugEventsRepository', () => {
+describe('PostgresEventStreamReadRepository', () => {
     it('maps debug event rows', async () => {
         const queryMock: Queryable['query'] = async <Row>() => ({
             rows: [
@@ -12,6 +12,8 @@ describe('PostgresDebugEventsRepository', () => {
                     event_type: 'AgreementCreated',
                     previous_status: null,
                     new_status: 'CREATED',
+                    actor_id: 'merchant_1',
+                    actor_type: 'merchant',
                     request_id: 'req_1',
                     idempotency_key: 'idem_1',
                     payload: { agreementId: 'agr_123' },
@@ -24,7 +26,7 @@ describe('PostgresDebugEventsRepository', () => {
             query: ((text, values) => query(text, values)) as Queryable['query'],
         };
 
-        const repository = new PostgresDebugEventsRepository(pool);
+        const repository = new PostgresEventStreamReadRepository(pool);
         const result = await repository.listEvents({ limit: 25, agreementId: 'agr_123' });
 
         expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM agreement_events'), [25, 'agr_123']);
@@ -35,6 +37,8 @@ describe('PostgresDebugEventsRepository', () => {
                 eventType: 'AgreementCreated',
                 previousStatus: null,
                 newStatus: 'CREATED',
+                actorId: 'merchant_1',
+                actorType: 'merchant',
                 requestId: 'req_1',
                 idempotencyKey: 'idem_1',
                 payload: { agreementId: 'agr_123' },

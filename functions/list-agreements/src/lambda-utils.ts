@@ -1,1 +1,1 @@
-export * from '@payments-example/lambda-utils';
+export * from '@serverless-state-machine-cqrs/lambda-utils';

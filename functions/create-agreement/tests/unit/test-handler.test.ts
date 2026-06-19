@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createHandler } from '../../app';
-import { AgreementRepository, CreateAgreementResult } from '../../src/repository';
+import { AgreementRepository, CreateAgreementResult } from '../../src/command-repository';
 import {
     TEST_JWT_CLAIMS,
     asJwtHandlerEvent,
@@ -21,6 +21,9 @@ const parseBody = (body: string | undefined) => JSON.parse(body ?? '{}');
 describe('Create agreement handler', () => {
     const repository: jest.Mocked<AgreementRepository> = {
         createAgreement: jest.fn(),
+        findAgreementByPublicId: jest.fn(),
+        transitionAgreement: jest.fn(),
+        settleAgreement: jest.fn(),
     };
 
     beforeEach(() => {
@@ -49,9 +52,6 @@ describe('Create agreement handler', () => {
             partnerId: 'partner_2',
             amount: 1000,
         },
-        responseStatusCode: 201,
-        responseBody:
-            '{"agreementId":"agr_123","status":"CREATED","merchantId":"merchant_1","partnerId":"partner_2","amount":1000}',
     };
 
     it('returns 201 for a valid request', async () => {
@@ -164,9 +164,13 @@ describe('Create agreement handler', () => {
     it('replays a stored response for the same idempotency key and payload', async () => {
         repository.createAgreement.mockResolvedValue({
             kind: 'replayed',
-            responseStatusCode: 201,
-            responseBody:
-                '{"agreementId":"agr_123","status":"CREATED","merchantId":"merchant_1","partnerId":"partner_2","amount":1000}',
+            agreement: {
+                agreementId: 'agr_123',
+                status: 'CREATED',
+                merchantId: 'merchant_1',
+                partnerId: 'partner_2',
+                amount: 1000,
+            },
         });
 
         const handler = createHandler(repository);

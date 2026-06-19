@@ -1,4 +1,4 @@
--- Supabase auth setup for payments-example
+-- Supabase auth setup for serverless-state-machine-cqrs
 --
 -- This matches the live project: role data lives in auth.users.raw_app_meta_data,
 -- and public.custom_access_token_hook copies it onto top-level JWT claims

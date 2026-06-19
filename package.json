@@ -13,10 +13,13 @@
         "migrate:down": "node-pg-migrate -m db/migrations --envPath .env down",
         "smoke:async-retry": "node scripts/smoke-async-retry.mjs",
         "smoke:local-layer": "node scripts/local-layer-smoke.mjs",
-        "test": "cd functions/create-agreement && npm test && cd ../transition-agreement && npm test && cd ../list-agreements && npm test && cd ../debug-events && npm test && cd ../list-ledger && npm test && cd ../../apps/ui && npm test",
+        "check:query-boundaries": "node scripts/check-query-boundaries.mjs",
+        "test": "cd packages/domain && npm install && npm test && cd ../.. && npm run build:layer && npm run check:query-boundaries && cd packages/persistence && npm install && npm test && cd ../.. && cd functions/create-agreement && npm test && cd ../transition-agreement && npm test && cd ../list-agreements && npm test && cd ../debug-events && npm test && cd ../list-ledger && npm test && cd ../../apps/ui && npm test",
         "test:coverage": "cd functions/create-agreement && npm run unit -- --coverage --runInBand && cd ../transition-agreement && npm run unit -- --coverage --runInBand && cd ../list-agreements && npm run unit -- --coverage --runInBand && cd ../debug-events && npm run unit -- --coverage --runInBand && cd ../list-ledger && npm run unit -- --coverage --runInBand && cd ../../apps/ui && npm run test:coverage",
         "test:e2e": "cd apps/ui && npm run test:e2e",
-        "typecheck": "cd layers/lambda-utils && npm run build && cd ../.. && cd functions/create-agreement && npm run compile && cd ../transition-agreement && npm run compile && cd ../list-agreements && npm run compile && cd ../debug-events && npm run compile && cd ../list-ledger && npm run compile && cd ../../apps/ui && npm run typecheck",
+        "typecheck": "cd layers/lambda-utils && npm run build && cd ../.. && cd packages/domain && npm install && npm run compile && cd ../persistence && npm install && npm run compile && cd ../.. && cd functions/create-agreement && npm run compile && cd ../transition-agreement && npm run compile && cd ../list-agreements && npm run compile && cd ../debug-events && npm run compile && cd ../list-ledger && npm run compile && cd ../../apps/ui && npm run typecheck",
+        "build:domain": "cd packages/domain && npm install && npm run compile",
+        "build:persistence": "cd packages/persistence && npm install && npm run compile",
         "build:layer": "cd layers/lambda-utils && npm run build"
     },
     "dependencies": {

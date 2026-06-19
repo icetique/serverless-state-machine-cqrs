@@ -8,13 +8,13 @@ Desktop.ini
 node_modules/
 **/node_modules/
 
-# Lambda layer: commit compiled @payments-example/lambda-utils only (not pg — built via npm run build:layer)
+# Lambda layer: commit compiled @serverless-state-machine-cqrs/lambda-utils only (not pg — built via npm run build:layer)
 layers/lambda-utils/node_modules/
 layers/lambda-utils/nodejs/node_modules/*
-!layers/lambda-utils/nodejs/node_modules/@payments-example/
-layers/lambda-utils/nodejs/node_modules/@payments-example/*
-!layers/lambda-utils/nodejs/node_modules/@payments-example/lambda-utils/
-!layers/lambda-utils/nodejs/node_modules/@payments-example/lambda-utils/**
+!layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/
+!layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils/**
+!layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/domain/**
+!layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/persistence/**
 
 # Test / coverage output
 coverage/

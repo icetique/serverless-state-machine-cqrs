@@ -1,5 +1,9 @@
 import { createHash } from 'crypto';
-import { ActorType, AgreementRepository, SettleAgreementInput, TransitionAgreementResult } from '../repository';
+import type { SettleAgreementCommand, ActorType } from '@serverless-state-machine-cqrs/domain';
+import {
+    AgreementCommandRepository,
+    TransitionAgreementResult,
+} from '../repository';
 
 export interface SettlementProcessorInput {
     agreementId: string;
@@ -20,7 +24,7 @@ const buildSettlementRequestHash = (agreementId: string): string =>
         .update(JSON.stringify({ agreementId, eventType: 'AgreementSettled' }))
         .digest('hex');
 
-const mapProcessorInputToRepositoryInput = (input: SettlementProcessorInput): SettleAgreementInput => ({
+const mapProcessorInputToCommand = (input: SettlementProcessorInput): SettleAgreementCommand => ({
     agreementId: input.agreementId,
     idempotencyKey: input.idempotencyKey,
     requestHash: buildSettlementRequestHash(input.agreementId),
@@ -32,9 +36,9 @@ const mapProcessorInputToRepositoryInput = (input: SettlementProcessorInput): Se
 });
 
 export class DefaultSettlementProcessor implements SettlementProcessor {
-    constructor(private readonly repository: AgreementRepository) {}
+    constructor(private readonly repository: AgreementCommandRepository) {}
 
     async process(input: SettlementProcessorInput): Promise<TransitionAgreementResult> {
-        return this.repository.settleAgreement(mapProcessorInputToRepositoryInput(input));
+        return this.repository.settleAgreement(mapProcessorInputToCommand(input));
     }
 }

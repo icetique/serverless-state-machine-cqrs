@@ -34,7 +34,10 @@ serverless-state-machine-cqrs/
 │   ├── list-agreements/            # GET /agreements
 │   ├── list-ledger/                # GET /ledger
 │   └── debug-events/               # GET /debug/events
-├── layers/lambda-utils/            # Lambda layer: JWT auth + HTTP helpers (runtime)
+├── packages/
+│   ├── domain/                     # Commands, queries, state machine (pure TypeScript)
+│   └── persistence/                # PostgresAgreementCommandRepository (write side)
+├── layers/lambda-utils/            # Lambda layer: auth helpers + domain/persistence runtime packages
 ├── shared/                         # Compile-time auth contract for the UI only
 ├── tests/fixtures/http-api/        # Shared Lambda test fixtures (API Gateway events)
 ├── db/migrations/                  # Postgres schema migrations
@@ -87,6 +90,34 @@ If you are reviewing for production hardening, the highest-value next steps woul
     - schema for agreements, audit history, idempotency, and ledger
 - `layers/lambda-utils/`
     - shared auth helpers and HTTP utilities mounted into API Lambdas as a Lambda layer
+    - compiled `@serverless-state-machine-cqrs/domain` and `@serverless-state-machine-cqrs/persistence` packages for SAM runtime
+
+## Command vs query boundaries
+
+Phase 1 makes the CQRS split explicit in code and imports:
+
+| Side | Lambdas | Imports | Database access |
+|------|---------|---------|-----------------|
+| **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — create, transition, settle in one transaction with `agreement_events` + `outbox_events` |
+| **Queries** | `list-agreements`, `list-ledger`, `debug-events` | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories | `SELECT` only — no command repository imports |
+
+**Domain package** (`packages/domain/`) holds aggregate types, command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
+
+**Persistence package** (`packages/persistence/`) holds the merged `PostgresAgreementCommandRepository` used by all write handlers. It is built into the Lambda layer alongside `lambda-utils` (`npm run build:layer`).
+
+**Import rule:** if a file lives under a query Lambda, it must not import `@serverless-state-machine-cqrs/persistence`. Command Lambdas must not embed SQL for read models. Root `npm test` runs `scripts/check-query-boundaries.mjs` to enforce this.
+
+### Approve, fund, and settle as separate Lambdas
+
+`template.yaml` defines three HTTP transition functions (`ApproveAgreementFunction`, `FundAgreementFunction`, `SettleAgreementFunction`) that share one handler package but receive different env vars (`TRANSITION_EVENT_TYPE`, `TRANSITION_ACTION`, `TRANSITION_ACTOR_TYPE`). This is intentional:
+
+- **Independent deploy and scaling** — approve/fund/settle can be tuned separately (memory, concurrency, alarms).
+- **Least-privilege IAM** — each route maps to one Lambda; no runtime action dispatch table in a single fat handler.
+- **SAM/IaC clarity** — one API route per function matches the OpenAPI surface.
+
+Domain rules stay centralized in `packages/domain` (`validateTransition`, `assertTransitionConfig`). Merging into one transition Lambda would save cold starts but re-couple scaling and deployment; keep three functions unless operational requirements change.
+
+Behaviour is unchanged from upstream for Phase 1: `agreements.status` is still updated directly; dual-write to `agreement_events` remains. Phase 2 replaces the mutable row with event-store authority.
 
 ## Async settlement (SQS)
 

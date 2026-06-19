@@ -3,7 +3,7 @@ import {
     AGREEMENT_CREATED_DETAIL_TYPE,
     AGREEMENT_EVENT_SOURCE,
     buildAgreementEvent,
-} from '@payments-example/lambda-utils';
+} from '@serverless-state-machine-cqrs/lambda-utils';
 
 describe('buildAgreementEvent', () => {
     it('builds an AgreementDomainEvent with the correct shape', () => {

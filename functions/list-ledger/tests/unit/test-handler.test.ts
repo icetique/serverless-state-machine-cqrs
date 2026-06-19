@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createHandler } from '../../app';
-import { LedgerRepository } from '../../src/repository';
+import { LedgerReadRepository } from '../../src/repository';
 import { TEST_JWT_CLAIMS, createHttpApiEvent } from '../../../../tests/fixtures/http-api/http-api';
 
 const createEvent = (queryStringParameters?: Record<string, string>, claims = TEST_JWT_CLAIMS.admin) =>
@@ -12,7 +12,7 @@ const createEvent = (queryStringParameters?: Record<string, string>, claims = TE
 const parseBody = (body: string | undefined) => JSON.parse(body ?? '{}');
 
 describe('List ledger handler', () => {
-    const repository: jest.Mocked<LedgerRepository> = {
+    const repository: jest.Mocked<LedgerReadRepository> = {
         listEntries: jest.fn(),
     };
 

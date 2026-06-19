@@ -2,14 +2,18 @@
     "compilerOptions": {
         "target": "es2020",
         "module": "commonjs",
-        "outDir": "nodejs/node_modules/@payments-example/lambda-utils",
+        "outDir": "nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils",
         "rootDir": "src",
         "strict": true,
         "esModuleInterop": true,
         "declaration": true,
         "sourceMap": true,
         "skipLibCheck": true,
-        "types": ["node"]
+        "types": ["node"],
+        "baseUrl": ".",
+        "paths": {
+            "@serverless-state-machine-cqrs/domain": ["../../packages/domain/dist/index.d.ts"]
+        }
     },
     "include": ["src/**/*.ts"]
 }

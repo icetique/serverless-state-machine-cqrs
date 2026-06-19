@@ -1,9 +1,9 @@
 {
-    "name": "@payments-example/lambda-utils",
+    "name": "@serverless-state-machine-cqrs/lambda-utils",
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "build": "npm install && tsc && node scripts/copy-layer-deps.mjs"
+        "build": "node scripts/compile-domain.mjs && npm install && tsc && node scripts/copy-layer-deps.mjs && node scripts/copy-cqrs-packages.mjs"
     },
     "dependencies": {
         "pg": "^8.16.3"

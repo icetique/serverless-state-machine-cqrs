@@ -1,25 +1,8 @@
-import { AuthRole, type Queryable } from './lambda-utils';
+import { type Queryable } from './lambda-utils';
+import type { AgreementListItem, AgreementStatus, ListAgreementsQuery } from '@serverless-state-machine-cqrs/domain';
 
-export type AgreementStatus = 'CREATED' | 'APPROVED' | 'FUNDED' | 'SETTLED';
-
-export interface AgreementSummary {
-    agreementId: string;
-    status: AgreementStatus;
-    merchantId: string;
-    partnerId: string;
-    amount: number;
-    createdAt: string;
-}
-
-export interface AgreementsRepository {
-    listAgreements(query: AgreementsQuery): Promise<AgreementSummary[]>;
-}
-
-export interface AgreementsQuery {
-    limit: number;
-    role: AuthRole;
-    merchantId?: string;
-    partnerId?: string;
+export interface AgreementsReadRepository {
+    listAgreements(query: ListAgreementsQuery): Promise<AgreementListItem[]>;
 }
 
 interface AgreementSummaryRow {
@@ -31,10 +14,10 @@ interface AgreementSummaryRow {
     created_at: string;
 }
 
-export class PostgresAgreementsRepository implements AgreementsRepository {
+export class PostgresAgreementsReadRepository implements AgreementsReadRepository {
     constructor(private readonly pool: Queryable) {}
 
-    async listAgreements(query: AgreementsQuery): Promise<AgreementSummary[]> {
+    async listAgreements(query: ListAgreementsQuery): Promise<AgreementListItem[]> {
         const values: unknown[] = [query.limit];
         let filterClause = '';
 

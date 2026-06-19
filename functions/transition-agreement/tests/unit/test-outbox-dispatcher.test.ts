@@ -33,7 +33,7 @@ describe('Outbox dispatcher', () => {
         repository.claimPendingEvents.mockResolvedValue([
             {
                 id: 1,
-                eventSource: 'payments-example.agreements',
+                eventSource: 'serverless-state-machine-cqrs.agreements',
                 eventType: 'AgreementFunded',
                 payload: { agreementId: 'agr_123' },
                 attemptCount: 1,
@@ -44,7 +44,7 @@ describe('Outbox dispatcher', () => {
 
         expect(result).toEqual({ processed: 1, published: 1, failed: 0 });
         expect(publisher.publish).toHaveBeenCalledWith({
-            source: 'payments-example.agreements',
+            source: 'serverless-state-machine-cqrs.agreements',
             detailType: 'AgreementFunded',
             detail: { agreementId: 'agr_123' },
         });
@@ -56,14 +56,14 @@ describe('Outbox dispatcher', () => {
         repository.claimPendingEvents.mockResolvedValue([
             {
                 id: 1,
-                eventSource: 'payments-example.agreements',
+                eventSource: 'serverless-state-machine-cqrs.agreements',
                 eventType: 'AgreementFunded',
                 payload: { agreementId: 'agr_123' },
                 attemptCount: 1,
             },
             {
                 id: 2,
-                eventSource: 'payments-example.agreements',
+                eventSource: 'serverless-state-machine-cqrs.agreements',
                 eventType: 'AgreementSettled',
                 payload: { agreementId: 'agr_456' },
                 attemptCount: 3,
@@ -83,7 +83,7 @@ describe('Outbox dispatcher', () => {
         repository.claimPendingEvents.mockResolvedValue([
             {
                 id: 1,
-                eventSource: 'payments-example.agreements',
+                eventSource: 'serverless-state-machine-cqrs.agreements',
                 eventType: 'AgreementFunded',
                 payload: { agreementId: 'agr_123' },
                 attemptCount: 1,

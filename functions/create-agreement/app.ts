@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'crypto';
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
-import { AgreementRepository, PostgresAgreementRepository } from './src/repository';
+import {
+    AgreementCommandRepository,
+    PostgresAgreementCommandRepository,
+} from './src/command-repository';
+import { mapCreateAgreementResult } from './src/map-command-result';
 import {
     asHttpErrorResponse,
     assertMerchantOwnership,
@@ -76,7 +80,7 @@ const hashCreateAgreementRequest = (request: CreateAgreementRequest): string =>
         )
         .digest('hex');
 
-export const createHandler = (repository: AgreementRepository) => {
+export const createHandler = (repository: AgreementCommandRepository) => {
     return async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
         try {
             const authContext = requireAuthContext(event);
@@ -97,21 +101,7 @@ export const createHandler = (repository: AgreementRepository) => {
                 actorType: authContext.role,
             });
 
-            if (result.kind === 'conflict') {
-                return jsonResponse(409, { message: 'Idempotency-Key reuse with different payload' });
-            }
-
-            if (result.kind === 'replayed') {
-                return {
-                    statusCode: result.responseStatusCode,
-                    body: result.responseBody,
-                };
-            }
-
-            return {
-                statusCode: result.responseStatusCode,
-                body: result.responseBody,
-            };
+            return mapCreateAgreementResult(result);
         } catch (error) {
             const errorResponse = asHttpErrorResponse(error);
 
@@ -133,7 +123,7 @@ let defaultHandler:
 const getDefaultHandler = () => {
     if (!defaultHandler) {
         const pool = createPool(getDatabaseUrl());
-        const repository = new PostgresAgreementRepository(pool);
+        const repository = new PostgresAgreementCommandRepository(pool);
         defaultHandler = createHandler(repository);
     }
 

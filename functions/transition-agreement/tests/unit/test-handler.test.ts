@@ -30,6 +30,7 @@ const config = {
 
 describe('Transition agreement handler', () => {
     const repository: jest.Mocked<AgreementRepository> = {
+        createAgreement: jest.fn(),
         findAgreementByPublicId: jest.fn(),
         transitionAgreement: jest.fn(),
         settleAgreement: jest.fn(),
@@ -53,7 +54,7 @@ describe('Transition agreement handler', () => {
 
     const transitionedResult: TransitionAgreementResult = {
         kind: 'transitioned',
-        eventPayload: {
+        payload: {
             agreementId: 'agr_123',
             merchantId: 'merchant_1',
             partnerId: 'partner_2',
@@ -61,9 +62,6 @@ describe('Transition agreement handler', () => {
             previousStatus: 'CREATED',
             newStatus: 'APPROVED',
         },
-        responseStatusCode: 200,
-        responseBody:
-            '{"agreementId":"agr_123","merchantId":"merchant_1","partnerId":"partner_2","amount":1000,"previousStatus":"CREATED","newStatus":"APPROVED"}',
     };
 
     it('transitions an agreement', async () => {
@@ -121,8 +119,7 @@ describe('Transition agreement handler', () => {
         });
         repository.transitionAgreement.mockResolvedValue({
             kind: 'replayed',
-            responseStatusCode: 200,
-            responseBody: transitionedResult.responseBody,
+            payload: transitionedResult.payload,
         });
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
         expect(result.statusCode).toBe(200);
@@ -150,10 +147,12 @@ describe('Transition agreement handler', () => {
         });
         settlementProcessor.process.mockResolvedValue({
             kind: 'transitioned',
-            eventPayload: transitionedResult.eventPayload,
-            responseStatusCode: 200,
-            responseBody:
-                '{"agreementId":"agr_123","merchantId":"merchant_1","partnerId":"partner_2","amount":1000,"previousStatus":"FUNDED","newStatus":"SETTLED","transactionId":"txn_123"}',
+            payload: {
+                ...transitionedResult.payload,
+                previousStatus: 'FUNDED',
+                newStatus: 'SETTLED',
+                transactionId: 'txn_123',
+            },
         });
 
         const result = await createHandler(
@@ -236,7 +235,7 @@ describe('Transition agreement handler', () => {
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
 
         expect(result.statusCode).toBe(403);
-        expect(parseBody(result.body)).toEqual({ message: 'Partners may only approve their own agreements' });
+        expect(parseBody(result.body)).toEqual({ message: 'Partners may only act on their own agreements' });
     });
 
     it('returns 403 when a partner calls a merchant-only transition', async () => {
@@ -258,6 +257,6 @@ describe('Transition agreement handler', () => {
         )(createEvent('agr_123', 'idem_1'));
 
         expect(result.statusCode).toBe(403);
-        expect(parseBody(result.body)).toEqual({ message: 'Only merchants may fund agreements' });
+        expect(parseBody(result.body)).toEqual({ message: 'Only merchants may perform AgreementFunded' });
     });
 });

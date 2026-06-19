@@ -1,9 +1,54 @@
-import type {
-    APIGatewayEventRequestContextJWTAuthorizer,
-    APIGatewayEventRequestContextV2,
-    APIGatewayProxyEventV2,
-    APIGatewayProxyEventV2WithJWTAuthorizer,
-} from 'aws-lambda';
+// Minimal HTTP API v2 + JWT authorizer shapes for shared test fixtures (no aws-lambda dependency).
+
+export interface TestJwtAuthorizerContext {
+    principalId: string;
+    integrationLatency: number;
+    jwt: {
+        claims: Record<string, string | number | boolean | string[]>;
+        scopes: string[];
+    };
+}
+
+export interface TestHttpRequestContextV2 {
+    accountId: string;
+    apiId: string;
+    domainName: string;
+    domainPrefix: string;
+    http: {
+        method: string;
+        path: string;
+        protocol: string;
+        sourceIp: string;
+        userAgent: string;
+    };
+    requestId: string;
+    routeKey: string;
+    stage: string;
+    time: string;
+    timeEpoch: number;
+    authorizer?: TestJwtAuthorizerContext;
+}
+
+export interface TestHttpApiEventBase {
+    version: string;
+    routeKey: string;
+    rawPath: string;
+    rawQueryString: string;
+    headers: Record<string, string | undefined>;
+    isBase64Encoded: boolean;
+    body?: string;
+    pathParameters?: Record<string, string>;
+    queryStringParameters?: Record<string, string>;
+    stageVariables?: Record<string, string>;
+    cookies: string[];
+    requestContext: TestHttpRequestContextV2;
+}
+
+export type TestHttpApiEvent = TestHttpApiEventBase & {
+    requestContext: TestHttpRequestContextV2 & {
+        authorizer: TestJwtAuthorizerContext;
+    };
+};
 
 export type TestAuthRole = 'merchant' | 'partner' | 'admin';
 
@@ -35,8 +80,6 @@ export const TEST_JWT_CLAIMS: Record<TestAuthRole, TestJwtClaims> = {
     },
 };
 
-export type TestHttpApiEvent = APIGatewayProxyEventV2WithJWTAuthorizer;
-
 export const createUnsignedJwt = (claims: TestJwtClaims): string => {
     const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
     const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
@@ -57,7 +100,7 @@ type CreateHttpApiEventWithClaimsOptions = CreateHttpApiEventOptions & {
     claims: TestJwtClaims;
 };
 
-const toJwtClaims = (claims: TestJwtClaims): APIGatewayEventRequestContextJWTAuthorizer['jwt']['claims'] => ({
+const toJwtClaims = (claims: TestJwtClaims): Record<string, string | number | boolean | string[]> => ({
     sub: claims.sub,
     app_role: claims.app_role,
     ...(claims.merchant_id !== undefined ? { merchant_id: claims.merchant_id } : {}),
@@ -65,7 +108,7 @@ const toJwtClaims = (claims: TestJwtClaims): APIGatewayEventRequestContextJWTAut
     ...(claims.email !== undefined ? { email: claims.email } : {}),
 });
 
-const buildJwtAuthorizer = (claims: TestJwtClaims): APIGatewayEventRequestContextJWTAuthorizer => ({
+const buildJwtAuthorizer = (claims: TestJwtClaims): TestJwtAuthorizerContext => ({
     principalId: claims.sub,
     integrationLatency: 0,
     jwt: {
@@ -74,7 +117,7 @@ const buildJwtAuthorizer = (claims: TestJwtClaims): APIGatewayEventRequestContex
     },
 });
 
-const buildRequestContext = (requestId: string): APIGatewayEventRequestContextV2 => ({
+const buildRequestContext = (requestId: string): TestHttpRequestContextV2 => ({
     accountId: '123456789012',
     apiId: 'api-id',
     domainName: 'example.execute-api.eu-central-1.amazonaws.com',
@@ -121,10 +164,10 @@ const buildEventShell = ({
 };
 
 export function createHttpApiEvent(options: CreateHttpApiEventWithClaimsOptions): TestHttpApiEvent;
-export function createHttpApiEvent(options?: CreateHttpApiEventOptions): APIGatewayProxyEventV2;
+export function createHttpApiEvent(options?: CreateHttpApiEventOptions): TestHttpApiEventBase;
 export function createHttpApiEvent(
     options: CreateHttpApiEventOptions | CreateHttpApiEventWithClaimsOptions = {},
-): TestHttpApiEvent | APIGatewayProxyEventV2 {
+): TestHttpApiEvent | TestHttpApiEventBase {
     const requestId = options.requestId ?? 'req_123';
 
     if ('claims' in options && options.claims) {
@@ -139,20 +182,20 @@ export function createHttpApiEvent(
                 ...buildRequestContext(requestId),
                 authorizer: buildJwtAuthorizer(claims),
             },
-        } satisfies TestHttpApiEvent;
+        };
     }
 
     return {
         ...buildEventShell(options),
         requestContext: buildRequestContext(requestId),
-    } satisfies APIGatewayProxyEventV2;
+    };
 }
 
 /**
  * JWT-protected HTTP API handlers are typed with authorizer context. Use this only in tests
  * that deliberately invoke a handler without API Gateway JWT claims (401 paths).
  */
-export const asJwtHandlerEvent = (event: APIGatewayProxyEventV2): TestHttpApiEvent => event as TestHttpApiEvent;
+export const asJwtHandlerEvent = (event: TestHttpApiEventBase): TestHttpApiEvent => event as TestHttpApiEvent;
 
 /** Shape accepted by requireAuthContext — unauthenticated fixtures need an explicit bridge. */
 export type AuthContextInputEvent = {
@@ -160,5 +203,5 @@ export type AuthContextInputEvent = {
     headers?: Record<string, string | undefined>;
 };
 
-export const asAuthContextEvent = (event: APIGatewayProxyEventV2): AuthContextInputEvent =>
+export const asAuthContextEvent = (event: TestHttpApiEventBase): AuthContextInputEvent =>
     event as AuthContextInputEvent;

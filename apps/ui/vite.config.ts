@@ -1,8 +1,16 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const domainEntry = fileURLToPath(new URL('../../packages/domain/src/index.ts', import.meta.url));
+
 export default defineConfig({
     plugins: [react()],
+    resolve: {
+        alias: {
+            '@cqrs/domain': domainEntry,
+        },
+    },
     server: {
         proxy: {
             // Local dev only: browser calls /api/* on localhost:5173 (same origin, no CORS).

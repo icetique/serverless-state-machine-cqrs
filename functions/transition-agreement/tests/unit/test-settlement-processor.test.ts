@@ -5,6 +5,7 @@ import { buildSettlementProcessorInputFromMessage } from '../../src/settlement/s
 
 describe('Settlement processor', () => {
     const repository: jest.Mocked<AgreementRepository> = {
+        createAgreement: jest.fn(),
         findAgreementByPublicId: jest.fn(),
         transitionAgreement: jest.fn(),
         settleAgreement: jest.fn(),
@@ -12,17 +13,15 @@ describe('Settlement processor', () => {
 
     const transitionedResult: TransitionAgreementResult = {
         kind: 'transitioned',
-        eventPayload: {
+        payload: {
             agreementId: 'agr_123',
             merchantId: 'merchant_1',
             partnerId: 'partner_2',
             amount: 1000,
             previousStatus: 'FUNDED',
             newStatus: 'SETTLED',
+            transactionId: 'txn_123',
         },
-        responseStatusCode: 200,
-        responseBody:
-            '{"agreementId":"agr_123","merchantId":"merchant_1","partnerId":"partner_2","amount":1000,"previousStatus":"FUNDED","newStatus":"SETTLED","transactionId":"txn_123"}',
     };
 
     it('settles an agreement through the repository', async () => {
@@ -54,8 +53,7 @@ describe('Settlement processor', () => {
     it('replays without additional processor side effects', async () => {
         repository.settleAgreement.mockResolvedValue({
             kind: 'replayed',
-            responseStatusCode: 200,
-            responseBody: transitionedResult.responseBody,
+            payload: transitionedResult.payload,
         });
 
         const processor = new DefaultSettlementProcessor(repository);

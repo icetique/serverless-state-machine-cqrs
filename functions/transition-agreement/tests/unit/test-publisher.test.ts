@@ -10,7 +10,7 @@ import {
 
 describe('publisher helpers', () => {
     const sampleEvent: DomainEvent = {
-        source: 'payments-example.agreements',
+        source: 'serverless-state-machine-cqrs.agreements',
         detailType: 'AgreementFunded',
         detail: { agreementId: 'agr_123' },
     };
@@ -46,7 +46,7 @@ describe('publisher helpers', () => {
             Entries: [
                 {
                     EventBusName: 'payments-bus',
-                    Source: 'payments-example.agreements',
+                    Source: 'serverless-state-machine-cqrs.agreements',
                     DetailType: 'AgreementFunded',
                     Detail: JSON.stringify({ agreementId: 'agr_123' }),
                 },

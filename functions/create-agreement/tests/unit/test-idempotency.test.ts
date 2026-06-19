@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from 'aws-lambda';
-import { getIdempotencyKey, ValidationError } from '@payments-example/lambda-utils';
+import { getIdempotencyKey, ValidationError } from '@serverless-state-machine-cqrs/lambda-utils';
 
 const eventWithHeaders = (headers: Record<string, string | undefined>): APIGatewayProxyEventV2WithJWTAuthorizer =>
     ({

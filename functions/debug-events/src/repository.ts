@@ -1,20 +1,15 @@
 import { type Queryable } from './lambda-utils';
+import type { AgreementStatus, EventStreamItem, ListEventStreamQuery } from '@serverless-state-machine-cqrs/domain';
 
-export interface DebugEventRecord {
+export type DebugEventRecord = EventStreamItem & {
     id: number;
-    agreementId: string;
-    eventType: string;
-    previousStatus: string | null;
-    newStatus: string;
     requestId: string;
     idempotencyKey: string;
     payload: Record<string, unknown>;
-    createdAt: string;
-}
+};
 
-export interface DebugEventsQuery {
-    limit: number;
-    agreementId?: string;
+export interface EventStreamReadRepository {
+    listEvents(query: ListEventStreamQuery): Promise<DebugEventRecord[]>;
 }
 
 interface DebugEventRow {
@@ -23,20 +18,18 @@ interface DebugEventRow {
     event_type: string;
     previous_status: string | null;
     new_status: string;
+    actor_id: string;
+    actor_type: string;
     request_id: string;
     idempotency_key: string;
     payload: Record<string, unknown>;
     created_at: string;
 }
 
-export interface DebugEventsRepository {
-    listEvents(query: DebugEventsQuery): Promise<DebugEventRecord[]>;
-}
-
-export class PostgresDebugEventsRepository implements DebugEventsRepository {
+export class PostgresEventStreamReadRepository implements EventStreamReadRepository {
     constructor(private readonly pool: Queryable) {}
 
-    async listEvents(query: DebugEventsQuery): Promise<DebugEventRecord[]> {
+    async listEvents(query: ListEventStreamQuery): Promise<DebugEventRecord[]> {
         const values: unknown[] = [query.limit];
         const agreementFilter = query.agreementId !== undefined ? `WHERE agreements.public_id = $2` : '';
 
@@ -52,6 +45,8 @@ export class PostgresDebugEventsRepository implements DebugEventsRepository {
                     agreement_events.event_type,
                     agreement_events.previous_status,
                     agreement_events.new_status,
+                    agreement_events.actor_id,
+                    agreement_events.actor_type,
                     agreement_events.request_id,
                     agreement_events.idempotency_key,
                     agreement_events.payload,
@@ -69,8 +64,10 @@ export class PostgresDebugEventsRepository implements DebugEventsRepository {
             id: row.id,
             agreementId: row.agreement_id,
             eventType: row.event_type,
-            previousStatus: row.previous_status,
-            newStatus: row.new_status,
+            previousStatus: row.previous_status as AgreementStatus | null,
+            newStatus: row.new_status as AgreementStatus,
+            actorId: row.actor_id,
+            actorType: row.actor_type,
             requestId: row.request_id,
             idempotencyKey: row.idempotency_key,
             payload: row.payload,

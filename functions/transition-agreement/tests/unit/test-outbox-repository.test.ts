@@ -26,7 +26,7 @@ describe('PostgresOutboxRepository', () => {
                 rows: [
                     {
                         id: 1,
-                        event_source: 'payments-example.agreements',
+                        event_source: 'serverless-state-machine-cqrs.agreements',
                         event_type: 'AgreementFunded',
                         payload: { agreementId: 'agr_123' },
                         attempt_count: 2,
@@ -41,7 +41,7 @@ describe('PostgresOutboxRepository', () => {
         expect(result).toEqual([
             {
                 id: 1,
-                eventSource: 'payments-example.agreements',
+                eventSource: 'serverless-state-machine-cqrs.agreements',
                 eventType: 'AgreementFunded',
                 payload: { agreementId: 'agr_123' },
                 attemptCount: 2,

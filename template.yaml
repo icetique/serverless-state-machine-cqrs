@@ -45,7 +45,7 @@ Resources:
     SharedLayer:
         Type: AWS::Serverless::LayerVersion
         Properties:
-            LayerName: payments-example-lambda-utils
+            LayerName: serverless-state-machine-cqrs-lambda-utils
             Description: Shared auth, HTTP utilities, and error helpers for API Lambdas
             ContentUri: layers/lambda-utils/
             CompatibleRuntimes:
@@ -174,7 +174,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 3
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/create-agreement'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/create-agreement'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -195,7 +195,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - app.ts
     DebugEventsFunction:
@@ -208,7 +210,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 5
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/debug-events'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/debug-events'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -228,7 +230,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - app.ts
     ListAgreementsFunction:
@@ -241,7 +245,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 5
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/list-agreements'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/list-agreements'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -261,7 +265,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - app.ts
     ListLedgerFunction:
@@ -274,7 +280,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 5
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/list-ledger'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/list-ledger'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -294,7 +300,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - app.ts
     ApproveAgreementFunction:
@@ -307,7 +315,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 3
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/approve-agreement'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/approve-agreement'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -331,7 +339,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - handlers/http/app.ts
     FundAgreementFunction:
@@ -344,7 +354,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 3
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/fund-agreement'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/fund-agreement'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -368,7 +378,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - handlers/http/app.ts
     SettleAgreementFunction:
@@ -381,7 +393,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 3
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/settle-agreement'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/settle-agreement'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -406,7 +418,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - handlers/http/app.ts
     SettlementQueue:
@@ -435,7 +449,7 @@ Resources:
             EventBusName: !Ref EventBusName
             EventPattern:
                 source:
-                    - payments-example.agreements
+                    - serverless-state-machine-cqrs.agreements
                 detail-type:
                     - AgreementFunded
             State: ENABLED
@@ -467,7 +481,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 2
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/settlement-processor'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/settlement-processor'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -489,7 +503,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - handlers/settlement/settlement-handler.ts
     OutboxDispatcherFunction:
@@ -502,7 +518,7 @@ Resources:
                 - x86_64
             # ReservedConcurrentExecutions: 2
             LoggingConfig:
-                LogGroup: !Sub '/payments-example/${AWS::StackName}/outbox-dispatcher'
+                LogGroup: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/outbox-dispatcher'
             Layers:
                 - !Ref SharedLayer
             Environment:
@@ -529,7 +545,9 @@ Resources:
                 Target: 'es2020'
                 Sourcemap: true
                 External:
-                    - '@payments-example/lambda-utils'
+                    - '@serverless-state-machine-cqrs/lambda-utils'
+                    - '@serverless-state-machine-cqrs/domain'
+                    - '@serverless-state-machine-cqrs/persistence'
                 EntryPoints:
                     - handlers/outbox/outbox-dispatcher.ts
 
@@ -538,63 +556,63 @@ Resources:
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/create-agreement'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/create-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     DebugEventsFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/debug-events'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/debug-events'
             RetentionInDays: !Ref LogRetentionInDays
     ListAgreementsFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/list-agreements'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/list-agreements'
             RetentionInDays: !Ref LogRetentionInDays
     ListLedgerFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/list-ledger'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/list-ledger'
             RetentionInDays: !Ref LogRetentionInDays
     ApproveAgreementFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/approve-agreement'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/approve-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     FundAgreementFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/fund-agreement'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/fund-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     SettleAgreementFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/settle-agreement'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/settle-agreement'
             RetentionInDays: !Ref LogRetentionInDays
     SettlementProcessorFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/settlement-processor'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/settlement-processor'
             RetentionInDays: !Ref LogRetentionInDays
     OutboxDispatcherFunctionLogGroup:
         DeletionPolicy: Delete
         UpdateReplacePolicy: Delete
         Type: AWS::Logs::LogGroup
         Properties:
-            LogGroupName: !Sub '/payments-example/${AWS::StackName}/outbox-dispatcher'
+            LogGroupName: !Sub '/serverless-state-machine-cqrs/${AWS::StackName}/outbox-dispatcher'
             RetentionInDays: !Ref LogRetentionInDays
 
     SettlementDeadLetterQueueAlarm:

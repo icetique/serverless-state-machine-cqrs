@@ -3,7 +3,7 @@
         {
             "messageId": "msg_evt_1",
             "receiptHandle": "AQEBmanual",
-            "body": "{\"id\":\"evt_1\",\"source\":\"payments-example.agreements\",\"detail-type\":\"AgreementFunded\",\"detail\":{\"agreementId\":\"agr_123\",\"merchantId\":\"merchant_1\",\"partnerId\":\"partner_2\",\"amount\":1000,\"previousStatus\":\"APPROVED\",\"newStatus\":\"FUNDED\"}}",
+            "body": "{\"id\":\"evt_1\",\"source\":\"serverless-state-machine-cqrs.agreements\",\"detail-type\":\"AgreementFunded\",\"detail\":{\"agreementId\":\"agr_123\",\"merchantId\":\"merchant_1\",\"partnerId\":\"partner_2\",\"amount\":1000,\"previousStatus\":\"APPROVED\",\"newStatus\":\"FUNDED\"}}",
             "attributes": {
                 "ApproximateReceiveCount": "1",
                 "SentTimestamp": "1710000000000",

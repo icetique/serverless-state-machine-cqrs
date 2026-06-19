@@ -1,21 +1,24 @@
 import { createHash } from 'crypto';
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
-import { AgreementRepository, AgreementLookup, PostgresAgreementRepository } from '../../src/repository';
+import {
+    assertTransitionConfig,
+    authorizeTransition,
+    DomainAuthorizationError,
+    type AgreementEventType,
+    type AgreementStatus,
+} from '@serverless-state-machine-cqrs/domain';
+import { AgreementCommandRepository, PostgresAgreementCommandRepository } from '../../src/repository';
 import {
     asHttpErrorResponse,
-    assertMerchantOwnership,
-    assertPartnerOwnership,
-    assertRole,
     createPool,
     getDatabaseUrl,
     getIdempotencyKey,
     jsonResponse,
     requireAuthContext,
-    type AgreementEventType,
-    type AgreementStatus,
     ValidationError,
 } from '../../src/lambda-utils';
 import { DefaultSettlementProcessor, SettlementProcessor } from '../../src/settlement/settlement-processor';
+import { mapTransitionAgreementResult } from '../../src/map-command-result';
 import { withHttpFailureSimulation } from '../../src/dev-failure-simulation';
 
 class ManualSettlementTriggerDisabledError extends Error {}
@@ -34,6 +37,8 @@ const getTransitionConfig = (): TransitionConfig => {
     if (!eventType || !expectedCurrentStatus || !nextStatus) {
         throw new Error('Transition environment is not configured');
     }
+
+    assertTransitionConfig(eventType, expectedCurrentStatus, nextStatus);
 
     return {
         eventType,
@@ -57,32 +62,8 @@ const hashTransitionRequest = (agreementId: string, eventType: AgreementEventTyp
 
 const isManualSettlementTriggerEnabled = (): boolean => process.env.ENABLE_MANUAL_SETTLEMENT_TRIGGER === 'true';
 
-const getMerchantTransitionVerb = (eventType: AgreementEventType): string => {
-    if (eventType === 'AgreementFunded') {
-        return 'fund';
-    }
-
-    return 'settle';
-};
-
-const authorizeTransition = (
-    authContext: ReturnType<typeof requireAuthContext>,
-    agreement: AgreementLookup,
-    transitionConfig: TransitionConfig,
-): void => {
-    if (transitionConfig.eventType === 'AgreementApproved') {
-        assertRole(authContext, 'partner', 'Only partners may approve agreements');
-        assertPartnerOwnership(authContext, agreement.partnerId, 'Partners may only approve their own agreements');
-        return;
-    }
-
-    const verb = getMerchantTransitionVerb(transitionConfig.eventType);
-    assertRole(authContext, 'merchant', `Only merchants may ${verb} agreements`);
-    assertMerchantOwnership(authContext, agreement.merchantId, `Merchants may only ${verb} their own agreements`);
-};
-
 export const createHandler = (
-    repository: AgreementRepository,
+    repository: AgreementCommandRepository,
     transitionConfig: TransitionConfig,
     settlementProcessor: SettlementProcessor = new DefaultSettlementProcessor(repository),
 ) => {
@@ -97,7 +78,8 @@ export const createHandler = (
                 return jsonResponse(404, { message: 'Agreement not found' });
             }
 
-            authorizeTransition(authContext, agreement, transitionConfig);
+            authorizeTransition(authContext, agreement, transitionConfig.eventType);
+
             if (transitionConfig.eventType === 'AgreementSettled' && !isManualSettlementTriggerEnabled()) {
                 throw new ManualSettlementTriggerDisabledError('Manual settlement trigger is disabled');
             }
@@ -124,36 +106,16 @@ export const createHandler = (
                           actorType: authContext.role,
                       });
 
-            if (result.kind === 'conflict') {
-                return jsonResponse(409, { message: 'Idempotency-Key reuse with different payload' });
-            }
-
-            if (result.kind === 'not_found') {
-                return jsonResponse(404, { message: 'Agreement not found' });
-            }
-
-            if (result.kind === 'invalid_transition') {
-                return jsonResponse(409, {
-                    message: `Invalid transition from ${result.currentStatus} to ${transitionConfig.nextStatus}`,
-                });
-            }
-
-            if (result.kind === 'replayed') {
-                return {
-                    statusCode: result.responseStatusCode,
-                    body: result.responseBody,
-                };
-            }
-
-            return {
-                statusCode: result.responseStatusCode,
-                body: result.responseBody,
-            };
+            return mapTransitionAgreementResult(result, transitionConfig.nextStatus);
         } catch (error) {
             const errorResponse = asHttpErrorResponse(error);
 
             if (errorResponse) {
                 return errorResponse;
+            }
+
+            if (error instanceof DomainAuthorizationError) {
+                return jsonResponse(403, { message: error.message });
             }
 
             if (error instanceof ManualSettlementTriggerDisabledError) {
@@ -172,7 +134,7 @@ let defaultHandler:
 
 const getDefaultHandler = () => {
     if (!defaultHandler) {
-        const repository = new PostgresAgreementRepository(createPool(getDatabaseUrl()));
+        const repository = new PostgresAgreementCommandRepository(createPool(getDatabaseUrl()));
         defaultHandler = withHttpFailureSimulation(createHandler(repository, getTransitionConfig()));
     }
 

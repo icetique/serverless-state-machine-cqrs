@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "module": "commonjs",
+        "strict": true,
+        "declaration": true,
+        "outDir": "dist",
+        "rootDir": "src",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@serverless-state-machine-cqrs/domain": ["../domain/dist/index.d.ts"],
+            "@serverless-state-machine-cqrs/lambda-utils": [
+                "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils/index.d.ts"
+            ]
+        }
+    },
+    "include": ["src/**/*"]
+}

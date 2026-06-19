@@ -1,3 +1,13 @@
+import type {
+    AgreementListItem,
+    AgreementStatus,
+    EventStreamItem,
+    LedgerEntryView,
+    TransitionAction,
+} from '@cqrs/domain';
+
+export type { AgreementStatus, TransitionAction };
+
 export type AgreementResult = {
     agreementId: string;
     merchantId: string;
@@ -9,36 +19,16 @@ export type AgreementResult = {
     transactionId?: string;
 };
 
-export type AgreementStatus = 'CREATED' | 'APPROVED' | 'FUNDED' | 'SETTLED';
+export type AgreementSummary = AgreementListItem;
 
-export type AgreementSummary = {
-    agreementId: string;
-    status: AgreementStatus;
-    merchantId: string;
-    partnerId: string;
-    amount: number;
-    createdAt: string;
-};
-
-export type EventRecord = {
+export type EventRecord = EventStreamItem & {
     id: number;
-    agreementId: string;
-    eventType: string;
-    previousStatus: string | null;
-    newStatus: string;
     requestId: string;
     idempotencyKey: string;
     payload: Record<string, unknown>;
-    createdAt: string;
 };
 
-export type LedgerEntry = {
-    transactionId: string;
-    agreementId: string;
-    amount: number;
-    entryType: string;
-    createdAt: string;
-};
+export type LedgerEntry = LedgerEntryView;
 
 export type FormState = {
     merchantId: string;
@@ -51,5 +41,3 @@ export type DemoAccount = {
     email: string;
     password: string;
 };
-
-export type TransitionAction = 'approve' | 'fund' | 'settle';

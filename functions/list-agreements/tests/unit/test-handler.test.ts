@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createHandler } from '../../app';
-import { AgreementsRepository } from '../../src/repository';
+import { AgreementsReadRepository } from '../../src/repository';
 import { TEST_JWT_CLAIMS, asJwtHandlerEvent, createHttpApiEvent } from '../../../../tests/fixtures/http-api/http-api';
 
 const createEvent = (queryStringParameters?: Record<string, string>, claims = TEST_JWT_CLAIMS.admin) =>
@@ -12,7 +12,7 @@ const createEvent = (queryStringParameters?: Record<string, string>, claims = TE
 const parseBody = (body: string | undefined) => JSON.parse(body ?? '{}');
 
 describe('List agreements handler', () => {
-    const repository: jest.Mocked<AgreementsRepository> = {
+    const repository: jest.Mocked<AgreementsReadRepository> = {
         listAgreements: jest.fn(),
     };
 

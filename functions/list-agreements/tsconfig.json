@@ -9,8 +9,14 @@
         "moduleResolution": "node",
         "baseUrl": ".",
         "paths": {
-            "@payments-example/lambda-utils": [
-                "../../layers/lambda-utils/nodejs/node_modules/@payments-example/lambda-utils/index.d.ts"
+            "@serverless-state-machine-cqrs/lambda-utils": [
+                "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/lambda-utils/index.d.ts"
+            ],
+            "@serverless-state-machine-cqrs/domain": [
+                "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/domain/index.d.ts"
+            ],
+            "@serverless-state-machine-cqrs/persistence": [
+                "../../layers/lambda-utils/nodejs/node_modules/@serverless-state-machine-cqrs/persistence/index.d.ts"
             ]
         },
         "esModuleInterop": true,

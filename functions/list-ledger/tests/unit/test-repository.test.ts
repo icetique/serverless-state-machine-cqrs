@@ -1,8 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { PostgresLedgerRepository } from '../../src/repository';
+import { PostgresLedgerReadRepository } from '../../src/repository';
 import { type Queryable } from '../../src/lambda-utils';
 
-describe('PostgresLedgerRepository', () => {
+describe('PostgresLedgerReadRepository', () => {
     it('maps ledger rows', async () => {
         const queryMock: Queryable['query'] = async <Row>() => ({
             rows: [
@@ -20,7 +20,7 @@ describe('PostgresLedgerRepository', () => {
             query: ((text, values) => query(text, values)) as Queryable['query'],
         };
 
-        const result = await new PostgresLedgerRepository(pool).listEntries(10);
+        const result = await new PostgresLedgerReadRepository(pool).listEntries(10);
 
         expect(query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY ledger_entries.id DESC'), [10]);
         expect(result).toEqual([

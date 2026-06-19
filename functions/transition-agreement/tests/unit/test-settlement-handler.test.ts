@@ -27,7 +27,7 @@ const createFundedEnvelopeEvent = (): SQSEvent =>
                 messageId: 'msg_evt_1',
                 body: JSON.stringify({
                     id: 'evt_1',
-                    source: 'payments-example.agreements',
+                    source: 'serverless-state-machine-cqrs.agreements',
                     'detail-type': 'AgreementFunded',
                     detail: {
                         agreementId: 'agr_123',
@@ -50,8 +50,15 @@ describe('Settlement handler', () => {
     const mockProcessSuccess = () => {
         processor.process.mockResolvedValue({
             kind: 'replayed',
-            responseStatusCode: 200,
-            responseBody: '{}',
+            payload: {
+                agreementId: 'agr_123',
+                merchantId: 'merchant_1',
+                partnerId: 'partner_2',
+                amount: 1000,
+                previousStatus: 'FUNDED',
+                newStatus: 'SETTLED',
+                transactionId: 'txn_1',
+            },
         });
     };
 

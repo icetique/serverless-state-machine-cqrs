@@ -1,8 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { PostgresAgreementsRepository } from '../../src/repository';
+import { PostgresAgreementsReadRepository } from '../../src/repository';
 import { type Queryable } from '../../src/lambda-utils';
 
-describe('PostgresAgreementsRepository', () => {
+describe('PostgresAgreementsReadRepository', () => {
     it('maps agreement rows', async () => {
         const queryMock: Queryable['query'] = async <Row>() => ({
             rows: [
@@ -21,7 +21,7 @@ describe('PostgresAgreementsRepository', () => {
             query: ((text, values) => query(text, values)) as Queryable['query'],
         };
 
-        const result = await new PostgresAgreementsRepository(pool).listAgreements({
+        const result = await new PostgresAgreementsReadRepository(pool).listAgreements({
             limit: 10,
             role: 'admin',
         });
@@ -45,7 +45,7 @@ describe('PostgresAgreementsRepository', () => {
             query: ((text, values) => query(text, values)) as Queryable['query'],
         };
 
-        await new PostgresAgreementsRepository(pool).listAgreements({
+        await new PostgresAgreementsReadRepository(pool).listAgreements({
             limit: 10,
             role: 'merchant',
             merchantId: 'merchant_1',

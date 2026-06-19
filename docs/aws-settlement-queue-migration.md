@@ -5,7 +5,7 @@ After switching from global names (`settlement-queue`, `settlement-dlq`) to stac
 ## Local check (before AWS deploy)
 
 ```bash
-cd payments-example
+cd serverless-state-machine-cqrs
 sam build
 sam validate
 ```
