@@ -1,9 +1,14 @@
 # More information about the configuration file can be found here:
 # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-config.html
+#
+# Local API: sam local start-api --env-vars .env.json --disable-authorizer
+#   (Lambda env comes from .env.json, not deploy parameter_overrides below.)
+# Deploy: copy to samconfig.toml and set EventPublisherMode=eventbridge, production
+#   FrontendOrigin, and your OpsAlertsEmailEndpoint.
 version = 0.1
 
 [default.global.parameters]
-stack_name = "payments-example"
+stack_name = "serverless-state-machine-cqrs"
 region = "eu-central-1"
 
 [default.build.parameters]
@@ -17,7 +22,7 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-s3_prefix = "payments-example"
+s3_prefix = "serverless-state-machine-cqrs"
 region = "eu-central-1"
 parameter_overrides = "DatabaseUrl=\"REPLACE_ME\" EventPublisherMode=\"local\" EventBusName=\"default\" FrontendOrigin=\"http://localhost:5173\" SupabaseIssuer=\"https://your-project-ref.supabase.co/auth/v1\" SupabaseAudience=\"authenticated\" OpsAlertsEmailEndpoint=\"ops@example.com\""
 image_repositories = []

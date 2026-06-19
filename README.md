@@ -1,6 +1,9 @@
-# serverless-state-machine
+# serverless-state-machine-cqrs
 
-Serverless agreement and settlement workflow built with AWS SAM, Lambda, API Gateway, PostgreSQL, Supabase Auth, and a Vite UI.
+CQRS and event-sourced agreement settlement workflow built with AWS SAM, Lambda, API Gateway, PostgreSQL, Supabase Auth, and a Vite UI.
+
+> **Upstream reference:** [serverless-state-machine](https://github.com/icetique/serverless-state-machine) — CRUD + transactional outbox + deployed demo.  
+> **This repo:** experimental rewrite toward event-sourced writes, read-model projections, and explicit command/query separation.
 
 ## What it does
 
@@ -18,7 +21,7 @@ Serverless agreement and settlement workflow built with AWS SAM, Lambda, API Gat
 ## Repository layout
 
 ```text
-serverless-state-machine/
+serverless-state-machine-cqrs/
 ├── apps/
 │   └── ui/                         # Vite/React frontend (role-scoped workflow UI)
 ├── functions/

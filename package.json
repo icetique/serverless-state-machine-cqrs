@@ -1,8 +1,8 @@
 {
-    "name": "serverless-state-machine",
+    "name": "serverless-state-machine-cqrs",
     "version": "1.0.0",
     "private": true,
-    "description": "Serverless agreement workflow with JWT auth, outbox delivery, and async settlement processing",
+    "description": "CQRS and event-sourced agreement settlement on AWS SAM with idempotent commands, transactional outbox, and async SQS processing",
     "scripts": {
         "format": "prettier . --write",
         "format:check": "prettier . --check",
