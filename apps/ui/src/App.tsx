@@ -66,7 +66,6 @@ export default function App() {
         idempotencyKey,
         isSubmitting,
         onAmountChange,
-        onPartnerIdChange,
         resetForSignOut,
         result,
         runCreateAgreement,
@@ -168,7 +167,6 @@ export default function App() {
             ledgerError={ledgerError}
             onAmountChange={onAmountChange}
             onCreateAgreement={(event) => void handleCreateAgreement(event)}
-            onPartnerIdChange={onPartnerIdChange}
             onRefresh={refresh}
             onSignOut={() => void handleSignOut()}
             onTransition={(agreement, action) => void handleTransition(agreement, action)}

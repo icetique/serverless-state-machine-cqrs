@@ -36,7 +36,6 @@ type WorkflowDashboardProps = {
     ledgerError: string | null;
     onAmountChange: (value: string) => void;
     onCreateAgreement: (event: FormEvent<HTMLFormElement>) => void;
-    onPartnerIdChange: (value: string) => void;
     onRefresh: () => void;
     onSignOut: () => void;
     onTransition: (agreement: AgreementSummary, action: TransitionAction) => void;
@@ -65,7 +64,6 @@ export function WorkflowDashboard({
     ledgerError,
     onAmountChange,
     onCreateAgreement,
-    onPartnerIdChange,
     onRefresh,
     onSignOut,
     onTransition,
@@ -95,7 +93,6 @@ export function WorkflowDashboard({
                             isSubmitting={isSubmitting}
                             onAmountChange={onAmountChange}
                             onCreateAgreement={onCreateAgreement}
-                            onPartnerIdChange={onPartnerIdChange}
                         />
                     ) : null}
 

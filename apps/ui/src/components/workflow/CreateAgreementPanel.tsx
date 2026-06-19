@@ -7,7 +7,6 @@ type CreateAgreementPanelProps = {
     isSubmitting: boolean;
     onAmountChange: (value: string) => void;
     onCreateAgreement: (event: FormEvent<HTMLFormElement>) => void;
-    onPartnerIdChange: (value: string) => void;
 };
 
 export function CreateAgreementPanel({
@@ -16,7 +15,6 @@ export function CreateAgreementPanel({
     isSubmitting,
     onAmountChange,
     onCreateAgreement,
-    onPartnerIdChange,
 }: CreateAgreementPanelProps) {
     return (
         <section className="panel form-panel">
@@ -34,8 +32,12 @@ export function CreateAgreementPanel({
                 </p>
                 <label>
                     Partner ID
-                    <input onChange={(event) => onPartnerIdChange(event.target.value)} value={form.partnerId} />
+                    <input readOnly value={form.partnerId} />
                 </label>
+                <p className="helper-text locked-input-note">
+                    Demo partner fixed to <code>partner_2</code> (must match the partner JWT <code>partner_id</code>{' '}
+                    claim).
+                </p>
                 <label>
                     Amount (minor units, e.g. cents)
                     <input

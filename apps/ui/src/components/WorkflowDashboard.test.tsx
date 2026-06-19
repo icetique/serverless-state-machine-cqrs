@@ -32,7 +32,6 @@ const defaults: ComponentProps<typeof WorkflowDashboard> = {
     ledgerError: null,
     onAmountChange: () => undefined,
     onCreateAgreement: () => undefined,
-    onPartnerIdChange: () => undefined,
     onRefresh: () => undefined,
     onSignOut: () => undefined,
     onTransition: () => undefined,

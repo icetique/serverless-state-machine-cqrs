@@ -6,9 +6,11 @@ import { canViewAgreementAction } from './permissions';
 import type { AgreementResult, AgreementSummary, FormState, TransitionAction } from '../types';
 import type { WorkflowApi } from './workflowApi';
 
+const DEMO_PARTNER_ID = 'partner_2';
+
 const initialForm: FormState = {
     merchantId: '',
-    partnerId: 'partner_2',
+    partnerId: DEMO_PARTNER_ID,
     amount: '1000',
 };
 
@@ -30,7 +32,6 @@ type UseAgreementCommandsResult = {
     idempotencyKey: string;
     isSubmitting: boolean;
     onAmountChange: (value: string) => void;
-    onPartnerIdChange: (value: string) => void;
     resetForSignOut: () => void;
     result: AgreementResult | null;
     runCreateAgreement: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -90,10 +91,10 @@ export const useAgreementCommands = ({
         setActionError(null);
         setActionKeys({});
         setIdempotencyKey(crypto.randomUUID());
-        setForm((current) => ({
+        setForm({
             ...initialForm,
-            merchantId: current.merchantId,
-        }));
+            merchantId: '',
+        });
     };
 
     const runCreateAgreement = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -192,10 +193,6 @@ export const useAgreementCommands = ({
         setForm((current) => ({ ...current, amount: value }));
     };
 
-    const onPartnerIdChange = (value: string) => {
-        setForm((current) => ({ ...current, partnerId: value }));
-    };
-
     return {
         actionError,
         activeAction,
@@ -204,7 +201,6 @@ export const useAgreementCommands = ({
         idempotencyKey,
         isSubmitting,
         onAmountChange,
-        onPartnerIdChange,
         resetForSignOut,
         result,
         runCreateAgreement,
