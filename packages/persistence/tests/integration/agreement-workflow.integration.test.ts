@@ -8,6 +8,9 @@ const describeIntegration = databaseUrl ? describe : describe.skip;
 
 const hashRequest = (payload: unknown): string => createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 
+const merchantAuth = { subject: 'merchant-sub', role: 'merchant' as const, merchantId: 'merchant_1' };
+const partnerAuth = { subject: 'partner-sub', role: 'partner' as const, partnerId: 'partner_2' };
+
 describeIntegration('Agreement command workflow (Postgres)', () => {
     let pool: Pool;
     let repository: PostgresAgreementCommandRepository;
@@ -64,6 +67,7 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
             requestId: `req_${randomUUID()}`,
             actorId: 'integration_test',
             actorType: 'partner',
+            auth: partnerAuth,
         });
 
         expect(approved.kind).toBe('transitioned');
@@ -81,6 +85,7 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
             requestId: `req_${randomUUID()}`,
             actorId: 'integration_test',
             actorType: 'merchant',
+            auth: merchantAuth,
         });
 
         expect(funded.kind).toBe('transitioned');
@@ -92,11 +97,12 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
 
         const settled = await repository.settleAgreement({
             agreementId: publicId,
+            transactionId: `txn_${randomUUID()}`,
             idempotencyKey: `idem_settle_${randomUUID()}`,
             requestHash: hashRequest({ agreementId: publicId, eventType: 'AgreementSettled' }),
             requestId: `req_${randomUUID()}`,
             actorId: 'integration_test',
-            actorType: 'merchant',
+            actorType: 'system',
             triggerSource: 'integration_test',
         });
 
@@ -201,6 +207,7 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
             requestId: `req_${randomUUID()}`,
             actorId: 'integration_test',
             actorType: 'partner' as const,
+            auth: partnerAuth,
         };
 
         const first = await repository.transitionAgreement(transition);
@@ -273,6 +280,7 @@ describeIntegration('Agreement command workflow (Postgres)', () => {
                 requestId: `req_${randomUUID()}`,
                 actorId: 'integration_test',
                 actorType: 'partner',
+                auth: partnerAuth,
             });
 
         const [first, second] = await Promise.all([makeApprove('a'), makeApprove('b')]);

@@ -19,6 +19,10 @@ export const projectAgreementEvent = async (
                     stream_version
                 )
                 VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (public_id) DO UPDATE
+                SET status = EXCLUDED.status,
+                    stream_version = EXCLUDED.stream_version,
+                    updated_at = current_timestamp
             `,
             [
                 payload.agreementId,
@@ -63,6 +67,7 @@ export const projectLedgerEvent = async (client: TransactionalQueryable, event: 
                 entry_type
             )
             VALUES ($1, $2, $3, $4)
+            ON CONFLICT (transaction_id) DO NOTHING
         `,
         [transactionId, event.payload.agreementId, event.payload.amount, 'settlement'],
     );

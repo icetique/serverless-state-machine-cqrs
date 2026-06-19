@@ -64,23 +64,6 @@ export const assertTransitionEventType = (eventType: AgreementEventType): Transi
     return spec;
 };
 
-/** @deprecated Use assertTransitionEventType — kept for tests that verify invalid SAM wiring. */
-export const assertTransitionConfig = (
-    eventType: AgreementEventType,
-    expectedCurrentStatus: AgreementStatus,
-    nextStatus: AgreementStatus,
-): TransitionSpec => {
-    const spec = assertTransitionEventType(eventType);
-
-    if (spec.from !== expectedCurrentStatus || spec.to !== nextStatus) {
-        throw new InvalidTransitionError(
-            `Transition config mismatch for ${eventType}: expected ${spec.from}->${spec.to}, got ${expectedCurrentStatus}->${nextStatus}`,
-        );
-    }
-
-    return spec;
-};
-
 export const validateTransition = (
     eventType: AgreementEventType,
     currentStatus: AgreementStatus,

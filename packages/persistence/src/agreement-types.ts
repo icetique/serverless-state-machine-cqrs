@@ -49,4 +49,8 @@ export type TransitionAgreementResult =
     | {
           kind: 'invalid_transition';
           currentStatus: AgreementStatus;
+      }
+    | {
+          kind: 'forbidden';
+          message: string;
       };

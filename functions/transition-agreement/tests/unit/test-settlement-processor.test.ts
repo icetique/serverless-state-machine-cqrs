@@ -1,10 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { DefaultSettlementProcessor } from '../../src/settlement/settlement-processor';
-import { AgreementRepository, TransitionAgreementResult } from '../../src/repository';
+import { AgreementCommandRepository, TransitionAgreementResult } from '../../src/repository';
 import { buildSettlementProcessorInputFromMessage } from '../../src/settlement/settlement-message';
 
 describe('Settlement processor', () => {
-    const repository: jest.Mocked<AgreementRepository> = {
+    const repository: jest.Mocked<AgreementCommandRepository> = {
         createAgreement: jest.fn(),
         findAgreementByPublicId: jest.fn(),
         transitionAgreement: jest.fn(),
@@ -40,6 +40,7 @@ describe('Settlement processor', () => {
         expect(result).toBe(transitionedResult);
         expect(repository.settleAgreement).toHaveBeenCalledWith({
             agreementId: 'agr_123',
+            transactionId: expect.stringMatching(/^txn_/),
             idempotencyKey: 'idem_1',
             requestHash: expect.any(String),
             requestId: 'req_1',

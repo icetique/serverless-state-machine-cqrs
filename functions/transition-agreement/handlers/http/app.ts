@@ -1,11 +1,6 @@
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { createHash } from 'crypto';
-import {
-    authorizeTransition,
-    DomainAuthorizationError,
-    getTransitionSpec,
-    type AgreementEventType,
-} from '@serverless-state-machine-cqrs/domain';
+import { getTransitionSpec, type AgreementEventType } from '@serverless-state-machine-cqrs/domain';
 import { AgreementCommandRepository, PostgresAgreementCommandRepository } from '../../src/repository';
 import {
     asHttpErrorResponse,
@@ -69,13 +64,6 @@ export const createHandler = (
             const agreementId = getAgreementId(event);
             const idempotencyKey = getIdempotencyKey(event);
             const authContext = requireAuthContext(event);
-            const agreement = await repository.findAgreementByPublicId(agreementId);
-
-            if (!agreement) {
-                return jsonResponse(404, { message: 'Agreement not found' });
-            }
-
-            authorizeTransition(authContext, agreement, transitionConfig.eventType);
 
             if (transitionConfig.eventType === 'AgreementSettled' && !isManualSettlementTriggerEnabled()) {
                 throw new ManualSettlementTriggerDisabledError('Manual settlement trigger is disabled');
@@ -90,6 +78,7 @@ export const createHandler = (
                           triggerSource: 'http_manual',
                           actorId: authContext.subject,
                           actorType: authContext.role,
+                          auth: authContext,
                       })
                     : await (async () => {
                           const { eventType } = transitionConfig;
@@ -105,6 +94,7 @@ export const createHandler = (
                               requestId: event.requestContext.requestId ?? 'local-request',
                               actorId: authContext.subject,
                               actorType: authContext.role,
+                              auth: authContext,
                           });
                       })();
 
@@ -114,10 +104,6 @@ export const createHandler = (
 
             if (errorResponse) {
                 return errorResponse;
-            }
-
-            if (error instanceof DomainAuthorizationError) {
-                return jsonResponse(403, { message: error.message });
             }
 
             if (error instanceof ManualSettlementTriggerDisabledError) {

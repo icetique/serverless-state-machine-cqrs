@@ -1,4 +1,5 @@
 import type { SessionIdentity } from '../../../../../shared/auth-contract';
+import { formatMoneyMinorUnits } from '@cqrs/domain';
 import { canViewAgreementAction, getActionTone, getStatusTone } from '../../workflow/permissions';
 import type { AgreementSummary, TransitionAction } from '../../types';
 
@@ -54,7 +55,7 @@ export function AgreementsPanel({
                                     <div className="event-meta">
                                         <span>merchant: {agreement.merchantId}</span>
                                         <span>partner: {agreement.partnerId}</span>
-                                        <span>amount: {agreement.amount}</span>
+                                        <span>amount: {formatMoneyMinorUnits(agreement.amount)}</span>
                                     </div>
                                 </div>
                                 <span className={`status-pill status-pill--${getStatusTone(agreement.status)}`}>

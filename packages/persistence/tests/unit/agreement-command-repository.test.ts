@@ -149,6 +149,7 @@ describe('PostgresAgreementCommandRepository', () => {
             requestId: 'req_2',
             actorId: 'partner',
             actorType: 'partner',
+            auth: { subject: 'partner-sub', role: 'partner', partnerId: 'partner_2' },
         });
 
         expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO event_store'))).toBe(true);
@@ -202,6 +203,7 @@ describe('PostgresAgreementCommandRepository', () => {
             requestId: 'req_3',
             actorId: 'merchant',
             actorType: 'merchant',
+            auth: { subject: 'merchant-sub', role: 'merchant', merchantId: 'merchant_1' },
         });
 
         expect(result).toEqual({ kind: 'invalid_transition', currentStatus: 'CREATED' });
@@ -273,6 +275,7 @@ describe('PostgresAgreementCommandRepository', () => {
         const repository = new PostgresAgreementCommandRepository(makePool(query));
         const result = await repository.settleAgreement({
             agreementId: 'agr_123',
+            transactionId: 'txn_integration_test',
             idempotencyKey: 'idem_settle',
             requestHash: 'hash_settle',
             requestId: 'req_4',
@@ -285,7 +288,7 @@ describe('PostgresAgreementCommandRepository', () => {
         expect(result.kind).toBe('transitioned');
         if (result.kind === 'transitioned') {
             expect(result.payload.newStatus).toBe('SETTLED');
-            expect(result.payload.transactionId).toMatch(/^txn_/);
+            expect(result.payload.transactionId).toBe('txn_integration_test');
         }
     });
 });

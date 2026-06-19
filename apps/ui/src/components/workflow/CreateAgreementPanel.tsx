@@ -37,14 +37,16 @@ export function CreateAgreementPanel({
                     <input onChange={(event) => onPartnerIdChange(event.target.value)} value={form.partnerId} />
                 </label>
                 <label>
-                    Amount
+                    Amount (minor units, e.g. cents)
                     <input
                         inputMode="numeric"
                         min="1"
+                        step="1"
                         onChange={(event) => onAmountChange(event.target.value)}
                         value={form.amount}
                     />
                 </label>
+                <p className="helper-text">Example: 1000 = $10.00 USD. Whole integers only — no decimals.</p>
                 <button className="primary-button" disabled={isSubmitting} type="submit">
                     {isSubmitting ? 'Creating…' : 'Create Agreement'}
                 </button>

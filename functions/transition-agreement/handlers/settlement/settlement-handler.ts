@@ -1,5 +1,5 @@
 import { SQSEvent, SQSBatchResponse } from 'aws-lambda';
-import { PostgresAgreementRepository } from '../../src/repository';
+import { PostgresAgreementCommandRepository } from '../../src/repository';
 import { createPool, getDatabaseUrl } from '../../src/lambda-utils';
 import { DefaultSettlementProcessor, SettlementProcessor } from '../../src/settlement/settlement-processor';
 import { parseSettlementQueueRecordBody } from '../../src/settlement/settlement-message';
@@ -30,7 +30,7 @@ let defaultHandler: ((event: SQSEvent) => Promise<SQSBatchResponse>) | undefined
 
 const getDefaultHandler = () => {
     if (!defaultHandler) {
-        const repository = new PostgresAgreementRepository(createPool(getDatabaseUrl()));
+        const repository = new PostgresAgreementCommandRepository(createPool(getDatabaseUrl()));
         const processor = new DefaultSettlementProcessor(repository);
         defaultHandler = withSqsFailureSimulation(createHandler(processor));
     }

@@ -37,7 +37,8 @@ There is **no** `user_roles` table in `db/migrations/`. You need:
 1. Rows in `auth.users` with `raw_app_meta_data` set
 2. Postgres function `public.custom_access_token_hook`
 3. Hook enabled in Supabase Dashboard (Authentication → Hooks → Custom access token)
-4. App schema from `npm run migrate:up` (see step 5)
+4. **RS256** JWT signing keys (API Gateway requirement — see step 3b)
+5. App schema from `npm run migrate:up` (see step 5)
 
 The hook reads **`claims.app_metadata`** (populated by Supabase from `raw_app_meta_data`) and copies fields onto **top-level** claims.
 
@@ -70,6 +71,17 @@ Open **SQL Editor** and run [`supabase-setup.sql`](./supabase-setup.sql), or pas
 
 - Enable the hook
 - Postgres function: `public.custom_access_token_hook`
+
+### 3b. JWT signing keys (RS256)
+
+API Gateway HTTP API JWT authorizers require **RSA (RS256)** tokens. Supabase defaults to ES256, which returns **401 Unauthorized** at the edge before Lambda runs.
+
+In **Authentication → JWT signing keys** (or Project Settings → API → JWT Settings, depending on dashboard version):
+
+- Use **RS256** signing for access tokens, or rotate to an RSA key pair if the project was created with ES256 only
+- After changing keys, users must sign out and sign in again
+
+The issuer (`https://<project-ref>.supabase.co/auth/v1`) and audience (`authenticated`) stay the same for `sam deploy` parameters.
 
 ### 4. Configure env files
 

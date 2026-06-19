@@ -136,7 +136,21 @@ describe('Create agreement handler', () => {
         );
 
         expect(result.statusCode).toBe(400);
-        expect(parseBody(result.body)).toEqual({ message: 'amount must be greater than zero' });
+        expect(parseBody(result.body)).toEqual({
+            message: 'amount must be a positive integer in minor currency units (e.g. cents)',
+        });
+    });
+
+    it('returns 400 when amount is not a whole number', async () => {
+        const handler = createHandler(repository);
+        const result = await handler(
+            createEvent(JSON.stringify({ merchantId: 'merchant_1', partnerId: 'partner_2', amount: 10.5 }), 'idem_1'),
+        );
+
+        expect(result.statusCode).toBe(400);
+        expect(parseBody(result.body)).toEqual({
+            message: 'amount must be a positive integer in minor currency units (e.g. cents)',
+        });
     });
 
     it('returns 400 when merchantId and partnerId match', async () => {

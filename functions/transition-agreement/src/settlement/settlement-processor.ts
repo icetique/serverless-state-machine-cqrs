@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type { SettleAgreementCommand, ActorType } from '@serverless-state-machine-cqrs/domain';
 import { AgreementCommandRepository, TransitionAgreementResult } from '../repository';
 
@@ -10,6 +10,7 @@ export interface SettlementProcessorInput {
     actorId: string;
     actorType: ActorType;
     messageId?: string;
+    auth?: SettleAgreementCommand['auth'];
 }
 
 export interface SettlementProcessor {
@@ -23,6 +24,7 @@ const buildSettlementRequestHash = (agreementId: string): string =>
 
 const mapProcessorInputToCommand = (input: SettlementProcessorInput): SettleAgreementCommand => ({
     agreementId: input.agreementId,
+    transactionId: `txn_${randomUUID()}`,
     idempotencyKey: input.idempotencyKey,
     requestHash: buildSettlementRequestHash(input.agreementId),
     requestId: input.requestId,
@@ -30,6 +32,7 @@ const mapProcessorInputToCommand = (input: SettlementProcessorInput): SettleAgre
     actorType: input.actorType,
     triggerSource: input.triggerSource,
     messageId: input.messageId,
+    auth: input.auth,
 });
 
 export class DefaultSettlementProcessor implements SettlementProcessor {

@@ -18,6 +18,27 @@ CQRS and event-sourced agreement settlement workflow built with AWS SAM, Lambda,
 - Exposes a local UI for workflow execution, Supabase-backed sign-in, event store inspection, and ledger visibility
 - Includes a `SettlementProcessorFunction` that consumes settlement work from SQS-shaped input
 
+## Demo workflow
+
+If you are new to this repo, start here. The app models a **merchant ↔ partner agreement** that moves through four statuses. Settlement after funding is **asynchronous** (not instant in the HTTP response).
+
+| Role         | Who               | What they do in the UI                                    |
+| ------------ | ----------------- | --------------------------------------------------------- |
+| **merchant** | e.g. `merchant_1` | Create agreements; fund after partner approval            |
+| **partner**  | e.g. `partner_2`  | Approve agreements for their `partner_id`                 |
+| **admin**    | —                 | No workflow buttons — inspect event store and ledger only |
+
+**Happy path**
+
+1. Complete [Supabase setup](docs/supabase-setup.md) and [local stack setup](#local-setup) (or use a deployed API + hosted UI).
+2. Sign in as **merchant** → create an agreement. Enter amount in **minor units** (e.g. `1000` = $10.00).
+3. Sign out → sign in as **partner** → **Approve**.
+4. Sign in as **merchant** again → **Fund**.
+5. Wait a few seconds. The UI polls until status is **SETTLED** (outbox → EventBridge → SQS → settlement Lambda).
+6. Optional: sign in as **admin** to view the event store and ledger.
+
+State-changing API calls need an `Idempotency-Key` header (the UI generates one per form submit). Reusing the same key safely returns the original outcome.
+
 ## Repository layout
 
 ```text
@@ -67,8 +88,6 @@ This repo is a **working demo** of agreement workflow, outbox delivery, and asyn
 | **Auth types**       | `shared/` (UI) vs `layers/lambda-utils` (Lambda)         | Same domain `AuthContext`, duplicated because the layer cannot import UI compile-time packages at runtime.                                     |
 | **UI polish**        | Global CSS; limited a11y                                 | Cohesive demo UI; not targeting WCAG compliance or design-system scoping.                                                                      |
 
-If you are reviewing for production hardening, the highest-value next steps would be CI, workspace tooling, and accessibility — none of which block the current workflow demo.
-
 ## Main components
 
 - `functions/create-agreement/`
@@ -97,12 +116,16 @@ If you are reviewing for production hardening, the highest-value next steps woul
 
 Commands append to `event_store` and update read models in one transaction. Queries read projections or the event log only.
 
-| Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                                       |
-| ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — replay stream, `decide`, append events, project `agreements_read_model` / `ledger_read_model`, `outbox_events` |
-| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` from read models (`list-*`) or `event_store` (`debug-events`) — no command repository imports                                                |
+| Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                                                         |
+| ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — replay stream, authorize (RBAC), `decide`, append events, project `agreements_read_model` / `ledger_read_model`, `outbox_events` |
+| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` from read models (`list-*`) or `event_store` (`debug-events`) — no command repository imports                                                                  |
 
-**Command-side replay:** before transitions and for RBAC checks, `findAgreementByPublicId` replays `event_store` (not the read model). List and ledger queries stay on projections.
+**Command-side replay:** before transitions, `PostgresAgreementCommandRepository` replays `event_store` inside the write transaction (advisory lock + `FOR UPDATE`), then runs `authorizeTransition` (RBAC only) and `decide` (lifecycle). List and ledger queries stay on projections.
+
+**Money:** agreement `amount` values are **minor currency units** (e.g. USD cents). `1000` means $10.00. The API rejects non-integer amounts; the UI displays formatted currency.
+
+**Transition HTTP codes:** `403` — caller not allowed (wrong role or wrong merchant/partner). `409` — action invalid for current status (e.g. double-approve race). `200` with same body — idempotency replay.
 
 **Concurrency:** writers on the same agreement stream take a Postgres advisory transaction lock, then `SELECT … FOR UPDATE` on existing events. Empty streams need the advisory lock because `FOR UPDATE` locks no rows.
 
@@ -130,7 +153,7 @@ Commands append to `event_store` and update read models in one transaction. Quer
 - **Least-privilege IAM** — each route maps to one Lambda; no runtime action dispatch table in a single fat handler.
 - **SAM/IaC clarity** — one API route per function matches the OpenAPI surface.
 
-Domain rules stay centralized in `packages/domain` (`validateTransition`, `getTransitionSpec`). Each transition Lambda sets `TRANSITION_EVENT_TYPE` only; the repository replays the stream and calls `decide`.
+Domain rules stay centralized in `packages/domain` (`authorizeTransition`, `validateTransition`, `decide`). Each transition Lambda sets `TRANSITION_EVENT_TYPE` only; the repository replays the stream under lock, authorizes, then calls `decide`.
 
 ## Async settlement (SQS)
 
@@ -155,11 +178,15 @@ create / approve / fund (HTTP Lambda)
   SettlementProcessorFunction            (SQS trigger; appends Settled + ledger projection)
 ```
 
+Settlement assigns a `transactionId` (e.g. `txn_<uuid>`) recorded in `ledger_read_model`.
+
 Infrastructure is defined in `template.yaml`: `SettlementQueue`, `FundedEventRule`, `SettlementProcessorFunction`, and `OutboxDispatcherFunction`.
 
 - **Deployed:** fund returns once `agreements_read_model` shows `FUNDED`; the UI polls until `SETTLED` (~outbox dispatch interval + SQS/Lambda latency).
 - **Local API (`sam local start-api`):** HTTP workflow works, but SQS is not wired automatically — use `sam local invoke OutboxDispatcherFunction` and `SettlementProcessorFunction` (or `npm run smoke:async-retry`) to exercise the async path.
 - **Manual settle:** `POST /agreements/{id}/settle` exists but is off by default (`ENABLE_MANUAL_SETTLEMENT_TRIGGER=false`).
+
+**SQS trust boundary:** only the settlement processor Lambda should consume `{StackName}-settlement-queue`. In production you would restrict `SendMessage` to EventBridge/outbox paths and treat queue payloads as internal commands (the processor still replays the aggregate before settling).
 
 See [Settlement execution modes](#settlement-execution-modes) for invoke commands and the retry smoke script.
 
@@ -175,7 +202,7 @@ Prerequisites:
 
 Use a **dedicated** Supabase project for this repo — not the upstream `payments-example` database (see [docs/supabase-setup.md](docs/supabase-setup.md)).
 
-Run migrations (loads `DATABASE_URL` from `.env` automatically). On a **new** project, run this once after supabase-setup steps 1–5:
+Run migrations (loads `DATABASE_URL` from `.env` automatically). On a **new** project, run this once after [Supabase setup](docs/supabase-setup.md) steps 1–5 (including **RS256** JWT keys in step 3b):
 
 ```bash
 cp .env.example .env   # first time only
@@ -210,12 +237,24 @@ For local UI, leave `VITE_API_BASE_URL` unset in `apps/ui/.env` (the app uses `/
 to `http://127.0.0.1:3000`). Do not point the browser directly at SAM — cross-origin CORS preflight
 fails with the OpenAPI `DefinitionBody` template. Restart `npm run dev` after changing `vite.config.ts`.
 
+## Deploy (AWS)
+
+After Supabase setup, `npm run migrate:up`, and a passing `npm run verify`:
+
+```bash
+sam build
+cp samconfig.example.toml samconfig.toml   # first time — set DatabaseUrl, SupabaseIssuer, FrontendOrigin, EventPublisherMode=eventbridge
+sam deploy
+```
+
+Host the UI separately (e.g. Vercel). In `apps/ui/.env`, set `VITE_API_BASE_URL` to the API Gateway URL from the stack output. Keep using the same Supabase project for sign-in.
+
 ## Auth
 
-See **[docs/supabase-setup.md](docs/supabase-setup.md)** for creating demo users, `raw_app_meta_data`, the `custom_access_token_hook` SQL, and JWT verification.
+See **[docs/supabase-setup.md](docs/supabase-setup.md)** for creating demo users, `raw_app_meta_data`, the `custom_access_token_hook` SQL, **RS256 JWT signing keys**, and JWT verification.
 
 - The frontend signs in with Supabase Auth and sends `Authorization: Bearer <access_token>`
-- **Deployed:** API Gateway HTTP API validates the JWT before invoking Lambda (`SupabaseJwtAuthorizer`)
+- **Deployed:** API Gateway HTTP API validates the JWT before invoking Lambda (`SupabaseJwtAuthorizer`). Supabase must issue **RS256** tokens — ES256 returns `401` at the edge (see [JWT signing keys](docs/supabase-setup.md#3b-jwt-signing-keys-rs256)).
 - **Local (`sam local start-api`):** use `--disable-authorizer`; Lambdas parse the bearer token in the
   shared layer when `AWS_SAM_LOCAL` is set (signature verification is skipped locally — acceptable
   for dev because you control the token source via Supabase sign-in)

@@ -1,8 +1,6 @@
 export {
     PostgresAgreementCommandRepository,
-    PostgresAgreementCommandRepository as PostgresAgreementRepository,
     type AgreementCommandRepository,
-    type AgreementCommandRepository as AgreementRepository,
     type AgreementLookup,
     type TransitionAgreementResult,
 } from '@serverless-state-machine-cqrs/persistence';

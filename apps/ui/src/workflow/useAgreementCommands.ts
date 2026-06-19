@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { parseMoneyMinorUnits } from '@cqrs/domain';
 import type { SessionIdentity } from '../../../../shared/auth-contract';
 import { canViewAgreementAction } from './permissions';
 import type { AgreementResult, AgreementSummary, FormState, TransitionAction } from '../types';
@@ -107,11 +108,12 @@ export const useAgreementCommands = ({
         setError(null);
 
         try {
+            const amount = parseMoneyMinorUnits(Number(form.amount));
             const createResult = await api.createAgreement(
                 {
                     merchantId: identity.merchantId ?? '',
                     partnerId: form.partnerId,
-                    amount: Number(form.amount),
+                    amount,
                 },
                 idempotencyKey,
             );
@@ -121,7 +123,11 @@ export const useAgreementCommands = ({
             setIsSubmitting(false);
             void loadAgreements();
         } catch (caughtError) {
-            setError(caughtError instanceof Error ? caughtError.message : 'Unknown submission failure');
+            setError(
+                caughtError instanceof Error
+                    ? caughtError.message
+                    : 'amount must be a positive integer in minor currency units (e.g. cents)',
+            );
             setIsSubmitting(false);
         }
     };

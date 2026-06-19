@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    assertTransitionConfig,
+    assertTransitionEventType,
     authorizeTransition,
     canRunAction,
     DomainAuthorizationError,
@@ -25,8 +25,23 @@ test('validateTransition accepts APPROVED to FUNDED', () => {
     }
 });
 
-test('assertTransitionConfig rejects mismatched env config', () => {
-    assert.throws(() => assertTransitionConfig('AgreementApproved', 'APPROVED', 'FUNDED'), InvalidTransitionError);
+test('assertTransitionEventType rejects AgreementCreated', () => {
+    assert.throws(() => assertTransitionEventType('AgreementCreated'), InvalidTransitionError);
+});
+
+test('authorizeTransition does not enforce lifecycle (state machine runs in decide)', () => {
+    assert.doesNotThrow(() =>
+        authorizeTransition(
+            { role: 'partner', partnerId: 'partner_2' },
+            {
+                agreementId: 'agr_1',
+                status: 'APPROVED',
+                merchantId: 'merchant_1',
+                partnerId: 'partner_2',
+            },
+            'AgreementApproved',
+        ),
+    );
 });
 
 test('authorizeTransition rejects merchant approving', () => {

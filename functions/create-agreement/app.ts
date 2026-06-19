@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'crypto';
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import { parseMoneyMinorUnits } from '@serverless-state-machine-cqrs/domain';
 import { AgreementCommandRepository, PostgresAgreementCommandRepository } from './src/command-repository';
 import { mapCreateAgreementResult } from './src/map-command-result';
 import {
@@ -55,14 +56,17 @@ const parseBody = (event: APIGatewayProxyEventV2WithJWTAuthorizer): CreateAgreem
         throw new ValidationError('amount is required');
     }
 
-    if (amount <= 0) {
-        throw new ValidationError('amount must be greater than zero');
+    let amountMinor: number;
+    try {
+        amountMinor = parseMoneyMinorUnits(amount);
+    } catch {
+        throw new ValidationError('amount must be a positive integer in minor currency units (e.g. cents)');
     }
 
     return {
         merchantId,
         partnerId,
-        amount,
+        amount: amountMinor,
     };
 };
 

@@ -1,10 +1,19 @@
-import { randomUUID } from 'crypto';
 import type {
+    CommandAuthContext,
     CreateAgreementCommand,
     SettleAgreementCommand,
     TransitionAgreementCommand,
 } from '@serverless-state-machine-cqrs/domain';
-import { decideCreate, decideSettlement, decideTransition, fromEvents } from '@serverless-state-machine-cqrs/domain';
+import {
+    authorizeTransition,
+    decideCreate,
+    decideSettlement,
+    decideTransition,
+    DomainAuthorizationError,
+    fromEvents,
+    type AgreementEventType,
+    type AgreementState,
+} from '@serverless-state-machine-cqrs/domain';
 import type { TransactionPool } from '@serverless-state-machine-cqrs/db-ports';
 import { insertEventStoreRow } from './event-store/append-event';
 import { loadStreamEvents, readStreamEvents } from './event-store/load-stream';
@@ -46,6 +55,33 @@ const toAgreementRecord = (payload: TransitionPayload): AgreementRecord => ({
     partnerId: payload.partnerId,
     amount: payload.amount,
 });
+
+const authorizeForTransition = (
+    auth: CommandAuthContext | undefined,
+    state: AgreementState,
+    eventType: AgreementEventType,
+    actorType: TransitionAgreementCommand['actorType'],
+): TransitionAgreementResult | null => {
+    if (actorType === 'system') {
+        return null;
+    }
+
+    if (!auth) {
+        return { kind: 'forbidden', message: 'Authentication is required' };
+    }
+
+    try {
+        authorizeTransition(auth, state, eventType);
+    } catch (error) {
+        if (error instanceof DomainAuthorizationError) {
+            return { kind: 'forbidden', message: error.message };
+        }
+
+        throw error;
+    }
+
+    return null;
+};
 
 const persistAppendedEvent = async (
     client: Parameters<typeof insertEventStoreRow>[0],
@@ -228,6 +264,17 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
                 return { kind: 'not_found' };
             }
 
+            const forbidden = authorizeForTransition(
+                command.auth,
+                aggregate.state,
+                command.eventType,
+                command.actorType,
+            );
+            if (forbidden) {
+                await client.query('COMMIT', []);
+                return forbidden;
+            }
+
             const decision = decideTransition(aggregate, command.eventType);
 
             if (decision.kind === 'not_found') {
@@ -303,8 +350,18 @@ export class PostgresAgreementCommandRepository implements AgreementCommandRepos
                 return { kind: 'not_found' };
             }
 
-            const transactionId = `txn_${randomUUID()}`;
-            const decision = decideSettlement(aggregate, transactionId);
+            const forbidden = authorizeForTransition(
+                command.auth,
+                aggregate.state,
+                'AgreementSettled',
+                command.actorType,
+            );
+            if (forbidden) {
+                await client.query('COMMIT', []);
+                return forbidden;
+            }
+
+            const decision = decideSettlement(aggregate, command.transactionId);
 
             if (decision.kind === 'not_found') {
                 await client.query('COMMIT', []);

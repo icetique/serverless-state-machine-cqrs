@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createHandler } from '../../handlers/http/app';
-import { AgreementRepository, TransitionAgreementResult } from '../../src/repository';
+import { AgreementCommandRepository, TransitionAgreementResult } from '../../src/repository';
 import { SettlementProcessor } from '../../src/settlement/settlement-processor';
 import { TEST_JWT_CLAIMS, asJwtHandlerEvent, createHttpApiEvent } from '../../../../tests/fixtures/http-api/http-api';
 
@@ -27,7 +27,7 @@ const config = {
 };
 
 describe('Transition agreement handler', () => {
-    const repository: jest.Mocked<AgreementRepository> = {
+    const repository: jest.Mocked<AgreementCommandRepository> = {
         createAgreement: jest.fn(),
         findAgreementByPublicId: jest.fn(),
         transitionAgreement: jest.fn(),
@@ -63,12 +63,6 @@ describe('Transition agreement handler', () => {
     };
 
     it('transitions an agreement', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'CREATED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
         repository.transitionAgreement.mockResolvedValue(transitionedResult);
 
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
@@ -79,6 +73,7 @@ describe('Transition agreement handler', () => {
                 agreementId: 'agr_123',
                 idempotencyKey: 'idem_1',
                 eventType: 'AgreementApproved',
+                auth: expect.objectContaining({ role: 'partner', partnerId: 'partner_2' }),
             }),
         );
     });
@@ -89,30 +84,18 @@ describe('Transition agreement handler', () => {
     });
 
     it('returns 404 when the agreement is not found', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue(null);
+        repository.transitionAgreement.mockResolvedValue({ kind: 'not_found' });
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
         expect(result.statusCode).toBe(404);
     });
 
     it('returns 409 for invalid state transitions', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'FUNDED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
         repository.transitionAgreement.mockResolvedValue({ kind: 'invalid_transition', currentStatus: 'FUNDED' });
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
         expect(result.statusCode).toBe(409);
     });
 
     it('replays stored responses without reprocessing', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'CREATED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
         repository.transitionAgreement.mockResolvedValue({
             kind: 'replayed',
             payload: transitionedResult.payload,
@@ -123,24 +106,12 @@ describe('Transition agreement handler', () => {
     });
 
     it('returns 409 for idempotency conflicts', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'CREATED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
         repository.transitionAgreement.mockResolvedValue({ kind: 'conflict' });
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
         expect(result.statusCode).toBe(409);
     });
 
     it('returns settlement transaction id when provided by the repository', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'FUNDED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
         settlementProcessor.process.mockResolvedValue({
             kind: 'transitioned',
             payload: {
@@ -166,17 +137,11 @@ describe('Transition agreement handler', () => {
             triggerSource: 'http_manual',
             actorId: TEST_JWT_CLAIMS.merchant.sub,
             actorType: 'merchant',
+            auth: expect.objectContaining({ role: 'merchant', merchantId: 'merchant_1' }),
         });
     });
 
     it('returns 403 when the manual settlement trigger is disabled', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'FUNDED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
-        });
-
         const previousFlag = process.env.ENABLE_MANUAL_SETTLEMENT_TRIGGER;
         process.env.ENABLE_MANUAL_SETTLEMENT_TRIGGER = 'false';
 
@@ -212,12 +177,10 @@ describe('Transition agreement handler', () => {
         expect(result.statusCode).toBe(401);
     });
 
-    it('returns 403 when the caller does not own the agreement for approval', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'CREATED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_999',
+    it('returns 403 when the caller is not allowed to approve', async () => {
+        repository.transitionAgreement.mockResolvedValue({
+            kind: 'forbidden',
+            message: 'Partners may only act on their own agreements',
         });
 
         const result = await createHandler(repository, config, settlementProcessor)(createEvent('agr_123', 'idem_1'));
@@ -227,11 +190,9 @@ describe('Transition agreement handler', () => {
     });
 
     it('returns 403 when a partner calls a merchant-only transition', async () => {
-        repository.findAgreementByPublicId.mockResolvedValue({
-            agreementId: 'agr_123',
-            status: 'APPROVED',
-            merchantId: 'merchant_1',
-            partnerId: 'partner_2',
+        repository.transitionAgreement.mockResolvedValue({
+            kind: 'forbidden',
+            message: 'Only merchants may perform AgreementFunded',
         });
 
         const result = await createHandler(

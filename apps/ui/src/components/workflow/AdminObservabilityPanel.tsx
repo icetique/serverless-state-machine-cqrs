@@ -1,4 +1,5 @@
 import type { EventRecord, LedgerEntry } from '../../types';
+import { formatMoneyMinorUnits } from '@cqrs/domain';
 
 type AdminObservabilityPanelProps = {
     events: EventRecord[];
@@ -40,7 +41,7 @@ export function AdminObservabilityPanel({
                                 <div className="event-meta">
                                     <span>agreement: {entry.agreementId}</span>
                                     <span>entry: {entry.entryType}</span>
-                                    <span>amount: {entry.amount}</span>
+                                    <span>amount: {formatMoneyMinorUnits(entry.amount)}</span>
                                 </div>
                             </article>
                         ))}

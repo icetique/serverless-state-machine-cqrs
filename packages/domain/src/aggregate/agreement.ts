@@ -49,9 +49,11 @@ export const fromEvents = (events: StreamEventRecord[]): AgreementAggregate => {
         state = applyEvent(state, event);
     }
 
+    const version = ordered.length === 0 ? 0 : ordered[ordered.length - 1]!.streamVersion;
+
     return {
         state,
-        version: ordered.length,
+        version,
     };
 };
 

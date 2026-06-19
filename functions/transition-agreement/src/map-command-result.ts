@@ -15,6 +15,10 @@ export const mapTransitionAgreementResult = (
         return jsonResponse(404, { message: 'Agreement not found' });
     }
 
+    if (result.kind === 'forbidden') {
+        return jsonResponse(403, { message: result.message });
+    }
+
     if (result.kind === 'invalid_transition') {
         return jsonResponse(409, {
             message: `Invalid transition from ${result.currentStatus} to ${targetStatus}`,
