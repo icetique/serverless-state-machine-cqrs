@@ -408,26 +408,26 @@ cd apps/ui && npm run build
 
 ## Available commands
 
-| Command                         | Description                                                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `npm run verify`                | Local pre-push gate: Prettier, SAM/cfn-lint, typecheck, ESLint, no-CRUD check, unit tests + query boundaries |
-| `npm run verify:full`           | `verify` then interactive Postgres integration tests (`INTEGRATION_DATABASE_URL`)                            |
-| `npm test`                      | Run all Lambda package and UI unit tests (no Postgres)                                                       |
-| `npm run test:integration`      | Postgres integration tests — **writes rows**; prompts for confirmation; not for production                   |
-| `npm run test:coverage`         | Run Lambda + UI tests with coverage                                                                          |
-| `npm run test:e2e`              | Playwright e2e (manual; needs local stack + `VITE_DEMO_*`)                                                   |
-| `npm run typecheck`             | Type-check all Lambda packages and the UI                                                                    |
-| `npm run lint`                  | ESLint all Lambda packages and UI (auto-fix)                                                                 |
-| `npm run lint:check`            | ESLint without writing fixes (included in `verify`)                                                          |
-| `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`)                |
-| `npm run format`                | Format all files with Prettier                                                                               |
-| `npm run format:check`          | Check formatting without writing                                                                             |
-| `npm run build:layer`           | Compile the shared Lambda layer                                                                              |
-| `npm run migrate:up`            | Apply pending database migrations                                                                            |
-| `npm run migrate:down`          | Roll back the last migration                                                                                 |
-| `npm run migrate:create`        | Scaffold a new migration file                                                                                |
+| Command                         | Description                                                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run verify`                | Local pre-push gate: Prettier, SAM/cfn-lint, typecheck, ESLint, no-CRUD check, unit tests + query boundaries                     |
+| `npm run verify:full`           | `verify` then interactive Postgres integration tests (`INTEGRATION_DATABASE_URL`)                                                |
+| `npm test`                      | Run all Lambda package and UI unit tests (no Postgres)                                                                           |
+| `npm run test:integration`      | Postgres integration tests — **writes rows**; prompts for confirmation; not for production                                       |
+| `npm run test:coverage`         | Run Lambda + UI tests with coverage                                                                                              |
+| `npm run test:e2e`              | Playwright e2e (manual; needs local stack + `VITE_DEMO_*`)                                                                       |
+| `npm run typecheck`             | Type-check all Lambda packages and the UI                                                                                        |
+| `npm run lint`                  | ESLint all Lambda packages and UI (auto-fix)                                                                                     |
+| `npm run lint:check`            | ESLint without writing fixes (included in `verify`)                                                                              |
+| `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`)                                    |
+| `npm run format`                | Format all files with Prettier                                                                                                   |
+| `npm run format:check`          | Check formatting without writing                                                                                                 |
+| `npm run build:layer`           | Compile the shared Lambda layer                                                                                                  |
+| `npm run migrate:up`            | Apply pending database migrations                                                                                                |
+| `npm run migrate:down`          | Roll back the last migration                                                                                                     |
+| `npm run migrate:create`        | Scaffold a new migration file                                                                                                    |
 | `npm run projections:rebuild`   | Truncate read models and replay from `event_store` (requires `DATABASE_URL`; prompts for confirmation; **not for live traffic**) |
-| `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test                                                                    |
-| `cd apps/ui && npm run dev`     | Start the Vite dev server                                                                                    |
-| `cd apps/ui && npm run build`   | Build the UI for production                                                                                  |
-| `cd apps/ui && npm run preview` | Preview the production build locally                                                                         |
+| `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test                                                                                        |
+| `cd apps/ui && npm run dev`     | Start the Vite dev server                                                                                                        |
+| `cd apps/ui && npm run build`   | Build the UI for production                                                                                                      |
+| `cd apps/ui && npm run preview` | Preview the production build locally                                                                                             |
