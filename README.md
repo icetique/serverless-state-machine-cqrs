@@ -129,6 +129,27 @@ Commands append to `event_store` and update read models in one transaction. Quer
 
 **Concurrency:** writers on the same agreement stream take a Postgres advisory transaction lock, then `SELECT … FOR UPDATE` on existing events. Empty streams need the advisory lock because `FOR UPDATE` locks no rows.
 
+### Sync projections (why not async?)
+
+Read models (`agreements_read_model`, `ledger_read_model`) are updated **synchronously** in the same Postgres transaction as each `event_store` append. After approve or fund returns, `GET /agreements` immediately reflects the new status (strong read-your-writes).
+
+This repo does **not** use an async read-model projector or `projection_checkpoints`. That is intentional for this demo.
+
+|               | Sync projections (this repo)  | Async projections (not implemented)    |
+| ------------- | ----------------------------- | -------------------------------------- |
+| Consistency   | Strong on list/ledger queries | Eventual — queries lag behind writes   |
+| Command path  | Append + project in one tx    | Append only; projector catches up      |
+| Best at scale | Low volume, few projections   | Many heavy read models, high write TPS |
+| Recovery      | `npm run projections:rebuild` | Checkpoints + full rebuild             |
+
+**Async we already have:** settlement **posting** runs asynchronously via outbox → EventBridge → SQS (see [Async settlement](#async-settlement-sqs)). That is integration async — like clearing trailing capture — not the same as async read-model projections.
+
+**Why sync here:** ~4 events per agreement, two simple projections, demo needs immediate workflow status, simpler local and e2e tests. At scale, async projections decouple durable writes from read-model work so commands stay thin and many projections scale independently — a pattern large settlement platforms use, but unnecessary complexity for this codebase.
+
+Read models are **disposable**: `npm run projections:rebuild` truncates them and replays from `event_store`. See [docs/architecture.md](docs/architecture.md) for diagrams and interview framing.
+
+**Rebuild operations:** `projections:rebuild` uses `TRUNCATE` on `agreements_read_model` and `ledger_read_model`. `event_store` is not modified. Do **not** run against a database receiving live command traffic — list/ledger queries will be empty or stale until replay completes. Use a maintenance window, a restored clone, or a throwaway Supabase project. The script prompts for confirmation before running.
+
 **Domain package** (`packages/domain/`) holds aggregate replay (`fromEvents`, `decide`), command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
 
 **Persistence package** (`packages/persistence/`) implements the event-sourced `PostgresAgreementCommandRepository`. It is built into the Lambda layer alongside `lambda-utils` (`npm run build:layer`).
@@ -405,6 +426,7 @@ cd apps/ui && npm run build
 | `npm run migrate:up`            | Apply pending database migrations                                                                            |
 | `npm run migrate:down`          | Roll back the last migration                                                                                 |
 | `npm run migrate:create`        | Scaffold a new migration file                                                                                |
+| `npm run projections:rebuild`   | Truncate read models and replay from `event_store` (requires `DATABASE_URL`; prompts for confirmation; **not for live traffic**) |
 | `npm run smoke:async-retry`     | Run the end-to-end async retry smoke test                                                                    |
 | `cd apps/ui && npm run dev`     | Start the Vite dev server                                                                                    |
 | `cd apps/ui && npm run build`   | Build the UI for production                                                                                  |

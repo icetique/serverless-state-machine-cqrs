@@ -12,6 +12,7 @@
         "migrate:create": "node-pg-migrate -m db/migrations --envPath .env create",
         "migrate:up": "node-pg-migrate -m db/migrations --envPath .env up",
         "migrate:down": "node-pg-migrate -m db/migrations --envPath .env down",
+        "projections:rebuild": "node scripts/rebuild-projections.mjs",
         "smoke:async-retry": "node scripts/smoke-async-retry.mjs",
         "smoke:local-layer": "node scripts/local-layer-smoke.mjs",
         "check:query-boundaries": "node scripts/check-query-boundaries.mjs",
