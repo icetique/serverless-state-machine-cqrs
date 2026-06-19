@@ -18,5 +18,4 @@ export const canViewAgreementAction = (
     agreement: AgreementSummary,
     action: TransitionAction,
     isManualSettlementTriggerEnabled: boolean,
-): boolean =>
-    domainCanViewAgreementAction(identity, agreement, action, isManualSettlementTriggerEnabled);
+): boolean => domainCanViewAgreementAction(identity, agreement, action, isManualSettlementTriggerEnabled);

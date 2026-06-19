@@ -7,6 +7,7 @@
         "dev": "vite",
         "build": "tsc -b && vite build",
         "lint": "eslint 'src/**/*.{ts,tsx}' --quiet --fix",
+        "lint:check": "eslint 'src/**/*.{ts,tsx}' --quiet",
         "preview": "vite preview",
         "typecheck": "tsc -b",
         "typecheck:test": "tsc -b tsconfig.test.json",

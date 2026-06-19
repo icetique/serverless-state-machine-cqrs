@@ -1,9 +1,6 @@
 import { createHash, randomUUID } from 'crypto';
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
-import {
-    AgreementCommandRepository,
-    PostgresAgreementCommandRepository,
-} from './src/command-repository';
+import { AgreementCommandRepository, PostgresAgreementCommandRepository } from './src/command-repository';
 import { mapCreateAgreementResult } from './src/map-command-result';
 import {
     asHttpErrorResponse,

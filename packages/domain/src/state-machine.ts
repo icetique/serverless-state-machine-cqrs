@@ -11,10 +11,7 @@ export interface TransitionSpec {
     role: AuthRole;
 }
 
-export const AGREEMENT_TRANSITIONS: Record<
-    Exclude<AgreementEventType, 'AgreementCreated'>,
-    TransitionSpec
-> = {
+export const AGREEMENT_TRANSITIONS: Record<Exclude<AgreementEventType, 'AgreementCreated'>, TransitionSpec> = {
     AgreementApproved: { eventType: 'AgreementApproved', from: 'CREATED', to: 'APPROVED', role: 'partner' },
     AgreementFunded: { eventType: 'AgreementFunded', from: 'APPROVED', to: 'FUNDED', role: 'merchant' },
     AgreementSettled: { eventType: 'AgreementSettled', from: 'FUNDED', to: 'SETTLED', role: 'merchant' },
@@ -88,10 +85,7 @@ export const validateTransition = (
     }
 
     if (spec.from !== currentStatus) {
-        return new InvalidTransitionError(
-            `Invalid transition from ${currentStatus} via ${eventType}`,
-            currentStatus,
-        );
+        return new InvalidTransitionError(`Invalid transition from ${currentStatus} via ${eventType}`, currentStatus);
     }
 
     return spec;

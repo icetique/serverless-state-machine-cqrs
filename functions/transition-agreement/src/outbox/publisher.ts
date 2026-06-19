@@ -12,6 +12,8 @@ export interface EventPublisher {
     publish(event: DomainEvent): Promise<void>;
 }
 
+type EventBridgeSendClient = Pick<EventBridgeClient, 'send'>;
+
 export class LocalLogPublisher implements EventPublisher {
     async publish(event: DomainEvent): Promise<void> {
         console.log(
@@ -25,7 +27,7 @@ export class LocalLogPublisher implements EventPublisher {
 
 export class AwsEventBridgePublisher implements EventPublisher {
     constructor(
-        private readonly client: Pick<EventBridgeClient, 'send'>,
+        private readonly client: EventBridgeSendClient,
         private readonly eventBusName: string,
     ) {}
 

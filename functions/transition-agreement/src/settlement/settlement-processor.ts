@@ -1,9 +1,6 @@
 import { createHash } from 'crypto';
 import type { SettleAgreementCommand, ActorType } from '@serverless-state-machine-cqrs/domain';
-import {
-    AgreementCommandRepository,
-    TransitionAgreementResult,
-} from '../repository';
+import { AgreementCommandRepository, TransitionAgreementResult } from '../repository';
 
 export interface SettlementProcessorInput {
     agreementId: string;

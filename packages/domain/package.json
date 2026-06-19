@@ -2,6 +2,8 @@
     "name": "@serverless-state-machine-cqrs/domain",
     "version": "1.0.0",
     "private": true,
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "scripts": {
         "compile": "tsc",
         "test": "npm run compile && node --test dist/tests/*.test.js"

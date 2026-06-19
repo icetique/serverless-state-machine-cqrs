@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
-import type { AgreementEventType, AgreementStatus, TransitionSpec, ActorType } from '@serverless-state-machine-cqrs/domain';
+import type {
+    AgreementEventType,
+    AgreementStatus,
+    TransitionSpec,
+    ActorType,
+} from '@serverless-state-machine-cqrs/domain';
 import { InvalidTransitionError, validateTransition } from '@serverless-state-machine-cqrs/domain';
 import type { TransactionalQueryable } from '@serverless-state-machine-cqrs/db-ports';
 import type { AgreementRow, TransitionAgreementResult, TransitionPayload } from './agreement-types';
@@ -46,12 +51,8 @@ export const applyAgreementTransition = async (
         onBeforePersist,
     } = params;
 
-    const idempotency = await checkIdempotency(
-        client,
-        idempotencyKey,
-        eventType,
-        requestHash,
-        (row) => parseTransitionPayload(row.response_body),
+    const idempotency = await checkIdempotency(client, idempotencyKey, eventType, requestHash, (row) =>
+        parseTransitionPayload(row.response_body),
     );
 
     if (idempotency.kind === 'conflict') {

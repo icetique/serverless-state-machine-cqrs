@@ -26,10 +26,7 @@ test('validateTransition accepts APPROVED to FUNDED', () => {
 });
 
 test('assertTransitionConfig rejects mismatched env config', () => {
-    assert.throws(
-        () => assertTransitionConfig('AgreementApproved', 'APPROVED', 'FUNDED'),
-        InvalidTransitionError,
-    );
+    assert.throws(() => assertTransitionConfig('AgreementApproved', 'APPROVED', 'FUNDED'), InvalidTransitionError);
 });
 
 test('authorizeTransition rejects merchant approving', () => {

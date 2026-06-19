@@ -58,14 +58,14 @@ serverless-state-machine-cqrs/
 
 This repo is a **working demo** of agreement workflow, outbox delivery, and async settlement — not a production product template. A few items are deliberately left as-is:
 
-| Area                 | Choice                                                   | Why                                                                                                                      |
-| -------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **CI**               | No GitHub Actions                                        | Quality gate is manual: `npm test`, `npm run typecheck`, `npm run validate:template`, `sam build` before demo or deploy. |
-| **Monorepo tooling** | No npm workspaces                                        | Keeps SAM `CodeUri` paths and per-Lambda packages straightforward; root scripts chain `cd` into each package.            |
-| **IaC routing**      | OpenAPI `DefinitionBody` plus explicit `Events: HttpApi` | SAM bug workaround so JWT authorizer routes deploy correctly — see comment block in `template.yaml`.                     |
-| **Outbox dispatch**  | At-least-once to EventBridge                             | Publish and `markPublished` cannot share a Postgres transaction with `PutEvents`; settlement is idempotent downstream.   |
-| **Auth types**       | `shared/` (UI) vs `layers/lambda-utils` (Lambda)         | Same domain `AuthContext`, duplicated because the layer cannot import UI compile-time packages at runtime.               |
-| **UI polish**        | Global CSS; limited a11y                                 | Cohesive demo UI; not targeting WCAG compliance or design-system scoping.                                                |
+| Area                 | Choice                                                   | Why                                                                                                                                            |
+| -------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CI**               | No GitHub Actions                                        | Quality gate is manual: `npm run verify` (or `npm test`, `npm run typecheck`, `npm run validate:template`, `sam build`) before demo or deploy. |
+| **Monorepo tooling** | No npm workspaces                                        | Keeps SAM `CodeUri` paths and per-Lambda packages straightforward; root scripts chain `cd` into each package.                                  |
+| **IaC routing**      | OpenAPI `DefinitionBody` plus explicit `Events: HttpApi` | SAM bug workaround so JWT authorizer routes deploy correctly — see comment block in `template.yaml`.                                           |
+| **Outbox dispatch**  | At-least-once to EventBridge                             | Publish and `markPublished` cannot share a Postgres transaction with `PutEvents`; settlement is idempotent downstream.                         |
+| **Auth types**       | `shared/` (UI) vs `layers/lambda-utils` (Lambda)         | Same domain `AuthContext`, duplicated because the layer cannot import UI compile-time packages at runtime.                                     |
+| **UI polish**        | Global CSS; limited a11y                                 | Cohesive demo UI; not targeting WCAG compliance or design-system scoping.                                                                      |
 
 If you are reviewing for production hardening, the highest-value next steps would be CI, workspace tooling, and accessibility — none of which block the current workflow demo.
 
@@ -97,10 +97,10 @@ If you are reviewing for production hardening, the highest-value next steps woul
 
 Phase 1 makes the CQRS split explicit in code and imports:
 
-| Side | Lambdas | Imports | Database access |
-|------|---------|---------|-----------------|
+| Side         | Lambdas                                                        | Imports                                                                                               | Database access                                                                                                                |
+| ------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Commands** | `create-agreement`, `transition-agreement` (HTTP + settlement) | `@serverless-state-machine-cqrs/domain`, `@serverless-state-machine-cqrs/persistence`, layer DB types | `PostgresAgreementCommandRepository` — create, transition, settle in one transaction with `agreement_events` + `outbox_events` |
-| **Queries** | `list-agreements`, `list-ledger`, `debug-events` | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories | `SELECT` only — no command repository imports |
+| **Queries**  | `list-agreements`, `list-ledger`, `debug-events`               | `@serverless-state-machine-cqrs/domain` query DTOs + function-local read repositories                 | `SELECT` only — no command repository imports                                                                                  |
 
 **Domain package** (`packages/domain/`) holds aggregate types, command payloads, query read models, event constants, and the state machine (`validateTransition`, `authorizeTransition`, `canRunAction`). The UI imports the same rules via the `@cqrs/domain` Vite alias (`permissions.ts`, `types.ts`).
 
@@ -259,7 +259,37 @@ node scripts/smoke-async-retry.mjs
 
 ## Testing
 
-Run all Lambda tests (compile + unit) from the project root:
+### Local verify (no database required)
+
+```bash
+npm run verify
+```
+
+Runs Prettier, `sam validate --lint`, TypeScript, ESLint (`lint:check`), and unit tests (including `check:query-boundaries`).
+
+`npm run verify:full` runs `verify` then prompts for Postgres integration tests (see below).
+
+### Postgres integration tests
+
+**Not safe on production.** Tests call the real command repository and **insert** agreements, audit events, outbox rows, ledger entries, and idempotency keys. Rows are **not** deleted afterward (IDs like `agr_int_*`, `agr_idem_*`).
+
+1. Set `INTEGRATION_DATABASE_URL` in `.env` to a **dedicated non-production** database (local Postgres or a throwaway Supabase project).
+2. Do **not** point this at `DATABASE_URL` for a production or shared demo DB unless you accept test junk in that database.
+3. Run:
+
+```bash
+npm run test:integration
+```
+
+The script prints the target host/database and asks you to type `yes` before running. For non-interactive use (only when you are sure):
+
+```bash
+INTEGRATION_TESTS_CONFIRM=yes npm run test:integration
+```
+
+`npm test` and `npm run verify` never touch Postgres.
+
+Run all Lambda unit tests (compile + unit) from the project root:
 
 ```bash
 npm test
@@ -307,11 +337,15 @@ cd apps/ui && npm run build
 
 | Command                         | Description                                                                                   |
 | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `npm test`                      | Run all Lambda package and UI unit tests                                                      |
+| `npm run verify`                | Local pre-push gate: Prettier, SAM/cfn-lint, typecheck, ESLint, unit tests + query boundaries |
+| `npm run verify:full`           | `verify` then interactive Postgres integration tests (`INTEGRATION_DATABASE_URL`)             |
+| `npm test`                      | Run all Lambda package and UI unit tests (no Postgres)                                        |
+| `npm run test:integration`      | Postgres integration tests — **writes rows**; prompts for confirmation; not for production    |
 | `npm run test:coverage`         | Run Lambda + UI tests with coverage                                                           |
-| `npm run test:e2e`              | Playwright smoke (manual; needs local stack)                                                  |
+| `npm run test:e2e`              | Playwright e2e (manual; needs local stack + `VITE_DEMO_*`)                                    |
 | `npm run typecheck`             | Type-check all Lambda packages and the UI                                                     |
-| `npm run lint`                  | Lint all Lambda packages and the UI                                                           |
+| `npm run lint`                  | ESLint all Lambda packages and UI (auto-fix)                                                  |
+| `npm run lint:check`            | ESLint without writing fixes (included in `verify`)                                           |
 | `npm run validate:template`     | Lint `template.yaml` via `sam validate --lint` (uses bundled cfn-lint; see `.cfnlintrc.yaml`) |
 | `npm run format`                | Format all files with Prettier                                                                |
 | `npm run format:check`          | Check formatting without writing                                                              |
