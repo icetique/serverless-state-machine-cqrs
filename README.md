@@ -146,7 +146,7 @@ This repo does **not** use an async read-model projector or `projection_checkpoi
 
 **Why sync here:** ~4 events per agreement, two simple projections, demo needs immediate workflow status, simpler local and e2e tests. At scale, async projections decouple durable writes from read-model work so commands stay thin and many projections scale independently — a pattern large settlement platforms use, but unnecessary complexity for this codebase.
 
-Read models are **disposable**: `npm run projections:rebuild` truncates them and replays from `event_store`. See [docs/architecture.md](docs/architecture.md) for diagrams and interview framing.
+Read models are **disposable**: `npm run projections:rebuild` truncates them and replays from `event_store`.
 
 **Rebuild operations:** `projections:rebuild` uses `TRUNCATE` on `agreements_read_model` and `ledger_read_model`. `event_store` is not modified. Do **not** run against a database receiving live command traffic — list/ledger queries will be empty or stale until replay completes. Use a maintenance window, a restored clone, or a throwaway Supabase project. The script prompts for confirmation before running.
 
